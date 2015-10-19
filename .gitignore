@@ -1,0 +1,4 @@
+*.o
+._*
+src/OrigImpl/runproject
+src/Impl/runproject
