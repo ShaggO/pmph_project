@@ -104,6 +104,10 @@ void   run_OrigCPU(
         // end updateParams
 
         REAL dtInv = 1.0/(globs.myTimeline[t+1]-globs.myTimeline[t]);
+        vector<vector<vector<REAL> > > u(outer,vector<vector<REAL> >(numY, vector<REAL>(numX)));   // [outer][numY][numX]
+        vector<vector<vector<REAL> > > v(outer,vector<vector<REAL> >(numX, vector<REAL>(numY)));   // [outer][numX][numY]
+        vector<vector<REAL> > a(outer,vector<REAL>(numZ)), b(outer,vector<REAL>(numZ)), c(outer,vector<REAL>(numZ)), y(outer,vector<REAL>(numZ));     // [outer][max(numX,numY)]
+        vector<vector<REAL> > yy(outer,vector<REAL>(numZ));  // temporary used in tridag  // [outer][max(numX,numY)]
 
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
@@ -111,23 +115,19 @@ void   run_OrigCPU(
              * Rollback function
              */
             unsigned j, k;
-            vector<vector<REAL> > u(numY, vector<REAL>(numX));   // [numY][numX]
-            vector<vector<REAL> > v(numX, vector<REAL>(numY));   // [numX][numY]
-            vector<REAL> a(numZ), b(numZ), c(numZ), y(numZ);     // [max(numX,numY)]
-            vector<REAL> yy(numZ);  // temporary used in tridag  // [max(numX,numY)]
             //	explicit x
             for(j=0;j<numX;j++) {
                 for(k=0;k<numY;k++) {
-                    u[k][j] = dtInv*globArr[i].myResult[j][k];
+                    u[i][k][j] = dtInv*globArr[i].myResult[j][k];
 
                     if(j > 0) {
-                        u[k][j] += 0.5*( 0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0] )
+                        u[i][k][j] += 0.5*( 0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0] )
                             * globArr[i].myResult[j-1][k];
                     }
-                    u[k][j]  +=  0.5*( 0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1] )
+                    u[i][k][j]  +=  0.5*( 0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1] )
                         * globArr[i].myResult[j][k];
                     if(j < numX-1) {
-                        u[k][j] += 0.5*( 0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2] )
+                        u[i][k][j] += 0.5*( 0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2] )
                             * globArr[i].myResult[j+1][k];
                     }
                 }
@@ -137,46 +137,46 @@ void   run_OrigCPU(
             for(k=0;k<numY;k++)
             {
                 for(j=0;j<numX;j++) {
-                    v[j][k] = 0.0;
+                    v[i][j][k] = 0.0;
 
                     if(k > 0) {
-                        v[j][k] +=  ( 0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0] )
+                        v[i][j][k] +=  ( 0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0] )
                             *  globArr[i].myResult[j][k-1];
                     }
-                    v[j][k]  +=   ( 0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1] )
+                    v[i][j][k]  +=   ( 0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1] )
                         *  globArr[i].myResult[j][k];
                     if(k < numY-1) {
-                        v[j][k] +=  ( 0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2] )
+                        v[i][j][k] +=  ( 0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2] )
                             *  globArr[i].myResult[j][k+1];
                     }
-                    u[k][j] += v[j][k];
+                    u[i][k][j] += v[i][j][k];
                 }
             }
 
             //	implicit x
             for(k=0;k<numY;k++) {
                 for(j=0;j<numX;j++) {  // here a, b,c should have size [numX]
-                    a[j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0]);
-                    b[j] = dtInv - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1]);
-                    c[j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2]);
+                    a[i][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0]);
+                    b[i][j] = dtInv - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1]);
+                    c[i][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2]);
                 }
                 // here yy should have size [numX]
-                tridag(a,b,c,u[k],numX,u[k],yy);
+                tridag(a[i],b[i],c[i],u[i][k],numX,u[i][k],yy[i]);
             }
 
             //	implicit y
             for(j=0;j<numX;j++) {
                 for(k=0;k<numY;k++) {  // here a, b, c should have size [numY]
-                    a[k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0]);
-                    b[k] = dtInv - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1]);
-                    c[k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2]);
+                    a[i][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0]);
+                    b[i][k] = dtInv - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1]);
+                    c[i][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2]);
                 }
 
                 for(k=0;k<numY;k++)
-                    y[k] = dtInv*u[k][j] - 0.5*v[j][k];
+                    y[i][k] = dtInv*u[i][k][j] - 0.5*v[i][j][k];
 
                 // here yy should have size [numY]
-                tridag(a,b,c,y,numY,globArr[i].myResult[j],yy);
+                tridag(a[i],b[i],c[i],y[i],numY,globArr[i].myResult[j],yy[i]);
             }
             // end rollback
 
