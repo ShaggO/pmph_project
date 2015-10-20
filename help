@@ -1,0 +1,5 @@
+1 identify redundant (hoistable) code inside loops - hoist it out
+2 identify the arrays that need privatisation, then do array expansion on them
+3 Advice: - keep transforming code on CPU
+          - keep vectors for nice indexing
+4 Distribution (perfects loop nests)
