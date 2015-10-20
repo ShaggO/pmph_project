@@ -1,4 +1,4 @@
-CXX        = clang-omp++
+CXX        = g++
 LIB        = -L$(OPENCL_LIBDIR) -lOpenCL
 CXXFLAGS   = -fopenmp -O3 -DWITH_FLOATS=0
 
