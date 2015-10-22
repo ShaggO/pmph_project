@@ -103,18 +103,19 @@ void   run_OrigCPU(
         }
         // end updateParams
 
+        /**
+         * Rollback function
+         */
         REAL dtInv = 1.0/(globs.myTimeline[t+1]-globs.myTimeline[t]);
         vector<vector<vector<REAL> > > u(outer,vector<vector<REAL> >(numY, vector<REAL>(numX)));   // [outer][numY][numX]
         vector<vector<vector<REAL> > > v(outer,vector<vector<REAL> >(numX, vector<REAL>(numY)));   // [outer][numX][numY]
         vector<vector<REAL> > a(outer,vector<REAL>(numZ)), b(outer,vector<REAL>(numZ)), c(outer,vector<REAL>(numZ)), y(outer,vector<REAL>(numZ));     // [outer][max(numX,numY)]
         vector<vector<REAL> > yy(outer,vector<REAL>(numZ));  // temporary used in tridag  // [outer][max(numX,numY)]
 
+        // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
-            /**
-             * Rollback function
-             */
-            unsigned j, k;
+            unsigned j,k;
             //	explicit x
             for(j=0;j<numX;j++) {
                 for(k=0;k<numY;k++) {
@@ -132,7 +133,12 @@ void   run_OrigCPU(
                     }
                 }
             }
+        }
 
+        // 3D kernel
+        #pragma omp parallel for default(shared) schedule(static) if(outer>8)
+        for( unsigned i = 0; i < outer; ++ i ) {
+            unsigned j, k;
             //	explicit y
             for(k=0;k<numY;k++)
             {
@@ -152,7 +158,11 @@ void   run_OrigCPU(
                     u[i][k][j] += v[i][j][k];
                 }
             }
+        }
 
+        #pragma omp parallel for default(shared) schedule(static) if(outer>8)
+        for( unsigned i = 0; i < outer; ++ i ) {
+            unsigned j, k;
             //	implicit x
             for(k=0;k<numY;k++) {
                 for(j=0;j<numX;j++) {  // here a, b,c should have size [numX]
