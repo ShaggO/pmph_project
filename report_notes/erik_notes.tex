@@ -29,7 +29,12 @@
 
 
 \begin{document}
-\section{CPU Parallelization Preparation}
+\chapter{Project Specifications}
+The group project for PMPH is about taking serial code implementing 
+\subsection{notes}
+After this work was done, ProjCoreOrig.cpp was is a state best for OpenMP parallelization, adding \texttt{\#pragma omp parallel for} before each parallelizable for loop and compiling with options \texttt{-Xcompiler} and \texttt{-fopenmp}. This is the version referred to in the results table, page \pageref{fig:results}.
+\section{
+\section{CPU Parallelization}
 \subsection{The Idea}
 Before even beginning to worry about \texttt{tridag}, we needed to prepare the CPU code. The first step is to conglomerate every secondary function, which allowed us to hoist the initialization of the globs (global variables) into glob arrays. That is, instead of initializing a temp variable or array for every iteration of a loop, we instead initialize an array one dimension larger, with size equal to the number of iterations of the loop, before the looping code.
 \begin{figure}[h]
@@ -43,7 +48,7 @@ Before even beginning to worry about \texttt{tridag}, we needed to prepare the C
   	...
   }
  \end{lstlisting}
- \caption{ A code snippet with tmpA initialized for every iteration.}
+ \caption{ \label{fig:nohoist} A code snippet with tmpA initialized for every iteration.}
  \end{figure}
  \begin{figure}[h]
  \begin{lstlisting}
@@ -56,7 +61,7 @@ Before even beginning to worry about \texttt{tridag}, we needed to prepare the C
   	...
   }
  \end{lstlisting}
- \caption{ The same code with tmpA hoisted.}
+ \caption{ \label{fig:yeshoist} The same code with tmpA hoisted.}
  \end{figure}
   
 The purpose of this is twofold. First, this allows us to serialize a computation which would otherwise be repeated by every thread. By computing it beforehand, the threads can be spared this extra work. Second, this allows us to easily parallelize the inner loops. Since each iteration of the inner \texttt{j} loop requires access to a single \texttt{tmpA} per iteration of the \texttt{i} loop, we would have to compute it, then pass it on as a variable to each of the threads. In the hoisted version, \texttt{tmpA[]} is copied to device memory, so that the inner loop can just access the appropriate version without much trouble.
@@ -66,7 +71,7 @@ we began by moving all of the secondary functions (\texttt{void updateParams}, \
 
 The work at this step is temporary. The code is objectively de-optimized, since more time is spent on initializing arrays, memory usage is larger, and the code runs slower. The purpose of this is to prepare the code for optimal loop distribution.
 
-The \texttt{REAL strike} variable has been removed, being placed instead inside of one of the kernels. The variables which have been hoisted at this step are listed in figure 3.
+The \texttt{REAL strike} variable has been removed, being placed instead inside of one of the kernels. The variables which have been hoisted at this step are listed in figure \ref{fig:globs}.
 \begin{figure}[h]
 \begin{lstlisting}
 void   run_OrigCPU(...
@@ -88,8 +93,14 @@ void   run_OrigCPU(...
     vector<vector<REAL> > yy(outer,vector<REAL>(numZ));  // temporary used in tridag  // [outer][max(numX,numY)]
     ...
 \end{lstlisting}
-\caption{ Hoisted variables in ProjCoreOrig.cpp. }
+\caption{ \label{fig:globs} Hoisted variables in ProjCoreOrig.cpp. }
 \end{figure}
+
+The other necessary modifications were to simply update the relevant variable references, for example, changing \texttt{globs.myResult[j][k]} to \texttt{globArr[i].myResult[j][k]}.
+\subsection{The Result}
+After this work, the program is in a state to distribute the various loops over parallel threads. There is a mild amount of slowdown, since we allocate more memory to some of the variables, and we perform some initial calculations which otherwise performed per loop iteration. This is not a good stopping point, but it is necessary to continue.
+\subsection{Correctness}
+The reason we are allowed to do this is because we are not fundamentally changing anything about the flow of the program. The extra dimension can be easily compared to a new variable per iteration, and since the variables are moving outwards in scope, nothing vital is changed.
 \section{Distributing Loops}
 \subsection{notes while writing}
 mem consumptin bigger, startup time increase threads, lot more threads, more overhead. It is not meant to be fancy, just as precursor to parallelization.
