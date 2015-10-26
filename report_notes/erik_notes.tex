@@ -30,14 +30,12 @@
 
 \begin{document}
 \section{CPU Parallelization Preparation}
-The first step for us was to begin preparing the CPU for kernel parallelization. Before distributing the outer loops in ProjCoreOrig.cpp,
- we began by moving all of the secondary functions (\texttt{void updateParams}, \texttt{void setPayoff}, \texttt{REAL value}, and \texttt{void rollback})into \texttt{int main}. This allowed us to easily see the globs (global variables) and their relations to one another.
- 
- Conglomerating the separate functions into one allowed us to hoist the initialization of the globs into glob arrays. That is, instead of initializing a temp variable or array for every iteration of a loop, we instead initialize an array one dimension larger, with size equal to the number of iterations of the loop, before the looping code. See figures 1 and 2 for an example. 
- \begin{figure}
- \begin{lstlisting}
+\subsection{The Idea}
+Before even beginning to worry about \texttt{tridag}, we needed to prepare the CPU code. The first step is to conglomerate every secondary function, which allowed us to hoist the initialization of the globs (global variables) into glob arrays. That is, instead of initializing a temp variable or array for every iteration of a loop, we instead initialize an array one dimension larger, with size equal to the number of iterations of the loop, before the looping code. See figures 1 and 2 for an example. 
+\begin{figure}
+\begin{lstlisting}
   for (int i = 0; i<max; i++){
-  	float tmpA = 0.0;
+  float tmpA = 0.0;
   	for (int j = 0; j<max2; j++){
   		tmpA += 2*B[j];
   		...
@@ -61,13 +59,26 @@ The first step for us was to begin preparing the CPU for kernel parallelization.
  \caption{ The same code with tmpA hoisted.}
  \end{figure}
   
-The purpose of this is to allow us to easily parallelize the inner loops. Since each iteration of the inner \texttt{j} loop requires access to a single \texttt{tmpA} per iteration of the \texttt{i} loop, we cannot distribute the inner loops in the original implementation. In the hoisted version, however, 
-\subsection{section notes while writing}
-the initialization of the glob array has been hoisted out
-prev, every iteration had an init of globs, now we have an array of globs and it is initialized beforehand, in each init it was init to same val
-first create init, create array where defaullt is the init value.
-\section{Loop}
+The purpose of this is twofold. First, this allows us to serialize a computation which would otherwise be repeated by every thread. By computing it beforehand, the threads can be spared this extra work. Second, this allows us to easily parallelize the inner loops. Since each iteration of the inner \texttt{j} loop requires access to a single \texttt{tmpA} per iteration of the \texttt{i} loop, we would have to compute it, then pass it on as a variable to each of the threads. In the hoisted version, \texttt{tempA[]} is copied to device memory, so that the inner loop can just access the appropriate version without much trouble.
+\subsection{The Work}
+The first step for us was to begin preparing the CPU for kernel parallelization. Before distributing the outer loops in ProjCoreOrig.cpp,
+we began by moving all of the secondary functions (\texttt{void updateParams}, \texttt{void setPayoff}, \texttt{REAL value}, and \texttt{void rollback}) into \texttt{void run\_OrigCPU}. This allowed us to easily see the globs and their relations to one another.
 
+The work at this step is temporary. More time is spent on initializing arrays, memory usage is larger, and the code runs slower. This is to help us prepare for parallel distribution.
+
+The \texttt{REAL strike} variable has been removed, being placed instead inside of one of the kernels. The variables which have been hoisted at this step are:
+\begin{lstlisting}
+void   run_OrigCPU(...
+{
+    initGrid(s0, alpha, nu, t, numX, numY, numT, globs);
+    initOperator(globs.myX,globs.myDxx);
+    initOperator(globs.myY,globs.myDyy);
+    vector<PrivGlobs> globArr (outer, globs);
+    ...
+\end{lstlisting}
+\section{Loop}
+\subsection{notes while writing}
+mem consumptin bigger, startup time increase threads, lot more threads, more overhead. It is not meant to be fancy, just as precursor to parallelization.
 \section{Simple CUDA}
 
 \section{TRIDAG}
