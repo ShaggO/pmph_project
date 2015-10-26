@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "Constants.h"
+#include <cuda_runtime.h>
+#include "ProjKernels.cu.h"
 
 using namespace std;
 
@@ -114,6 +116,10 @@ struct PrivGlobs {
 } __attribute__ ((aligned (128)));
 
 
+template<const unsigned T>
+void deviceInitGrid( const REAL s0, const REAL alpha, const REAL nu, const REAL t,
+        const unsigned outer, const unsigned numX, const unsigned numY, const unsigned numT, DevicePrivGlobs &globs);
+
 void initGrid(  const REAL s0, const REAL alpha, const REAL nu,const REAL t,
                 const unsigned numX, const unsigned numY, const unsigned numT, PrivGlobs& globs
             );
@@ -150,17 +156,31 @@ REAL   value(   PrivGlobs    globs,
                 const unsigned int numT
             );
 
-void run_optimGPU(
-                const unsigned int&   outer,
-                const unsigned int&   numX,
-                const unsigned int&   numY,
-                const unsigned int&   numT,
-                const REAL&           s0,
-                const REAL&           t,
-                const REAL&           alpha,
-                const REAL&           nu,
-                const REAL&           beta,
-                      REAL*           res   // [outer] RESULT
-            );
+template<const unsigned T>
+void deviceInitGrid( const REAL s0, const REAL alpha, const REAL nu, const REAL t,
+        const unsigned outer, const unsigned numX, const unsigned numY, const unsigned numT, DevicePrivGlobs &globs) {
+    const unsigned numZ = max(numX,max(numY,numT));
+    const unsigned dimy = ceil((float) numZ / T);
+    const unsigned dimx = ceil((float) outer / T);
+    const dim3 block(outer,numZ,1), grid(dimx,dimy,1);
+    const REAL stdX = 20.0*alpha*s0*sqrt(t);
+    const REAL dx = stdX/numX;
+
+    const REAL stdY = 10.0*nu*sqrt(t);
+    const REAL dy = stdY/numY;
+    const REAL logAlpha = log(alpha);
+
+    globs.myXindex = static_cast<unsigned>(s0/dx) % numX;
+    globs.myYindex = static_cast<unsigned>(numY/2.0);
+
+    const REAL myXvar = globs.myXindex*dx+s0;
+    const REAL myYvar = globs.myYindex*dy+logAlpha;
+    // myTimeline, myXindex and myYindex for each outer
+    initGridKernel<T><<<grid, block>>>(outer,numX,numY,numT,
+            globs.myTimeline,globs.myX,globs.myY,
+            myXvar, myYvar, dx, dy, t);
+    cudaThreadSynchronize();
+}
+
 
 #endif // PROJ_HELPER_FUNS

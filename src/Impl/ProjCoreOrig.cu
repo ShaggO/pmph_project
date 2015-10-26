@@ -1,4 +1,7 @@
-#include "ProjHelperFun.h"
+#ifndef PROJ_CORE_ORIG
+#define PROJ_CORE_ORIG
+#include "ProjHelperFun.cu.h"
+#include "ProjKernels.cu.h"
 #include "Constants.h"
 
 inline void tridag(
@@ -10,7 +13,7 @@ inline void tridag(
           vector<REAL>&   u,   // size [n]
           vector<REAL>&   uu   // size [n] temporary
 ) {
-    int    i, offset;
+    int    i;
     REAL   beta;
 
     u[0]  = r[0];
@@ -37,7 +40,7 @@ inline void tridag(
     for(i=0; i<n; i++) u[i] = a[n-1-i];
 #endif
 }
-
+template<const unsigned T>
 void   run_optimGPU(
                 const unsigned int&   outer,
                 const unsigned int&   numX,
@@ -59,6 +62,7 @@ void   run_optimGPU(
     initOperator(globs.myX,globs.myDxx);
     initOperator(globs.myY,globs.myDyy);
     vector<PrivGlobs> globArr (outer, globs);
+    deviceInitGrid<T>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs); 
 
     unsigned numZ = max(numX,numY);
 
@@ -237,4 +241,4 @@ void   run_optimGPU(
     }
 }
 
-//#endif // PROJ_CORE_ORIG
+#endif // PROJ_CORE_ORIG

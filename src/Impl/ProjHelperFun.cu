@@ -1,9 +1,12 @@
-#include "ProjHelperFun.h"
+#ifndef PROJ_HELPER_FUNS_CU
+#define PROJ_HELPER_FUNS_CU
+
+#include "ProjHelperFun.cu.h"
+#include "ProjKernels.cu.h"
 
 /**************************/
 /**** HELPER FUNCTIONS ****/
 /**************************/
-
 /**
  * Fills in:
  *   globs.myTimeline  of size [0..numT-1]
@@ -78,7 +81,4 @@ void initOperator(  const vector<REAL>& x,
 	Dxx[n-1][2] = 0.0;
     Dxx[n-1][3] = 0.0;
 }
-
-
-
-
+#endif //PROJ_HELPER_FUN

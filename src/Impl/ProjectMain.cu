@@ -1,7 +1,10 @@
 #include "OpenmpUtil.h"
 #include "ParseInput.h"
+#include <cuda_runtime.h>
 
-#include "ProjHelperFun.h"
+#include "ProjHelperFun.cu.h"
+#include "ProjCoreOrig.cu.h"
+#include "ProjKernels.cu.h"
 
 int main()
 {
@@ -11,6 +14,7 @@ int main()
     readDataSet( OUTER_LOOP_COUNT, NUM_X, NUM_Y, NUM_T );
 
     const int Ps = get_CPU_num_threads();
+    const unsigned T = 32;
     REAL* res = (REAL*)malloc(OUTER_LOOP_COUNT*sizeof(REAL));
 
     {   // Original Program (Sequential CPU Execution)
@@ -20,7 +24,7 @@ int main()
         struct timeval t_start, t_end, t_diff;
         gettimeofday(&t_start, NULL);
 
-        run_optimGPU( OUTER_LOOP_COUNT, NUM_X, NUM_Y, NUM_T, s0, t, alpha, nu, beta, res );
+        run_optimGPU<T>( OUTER_LOOP_COUNT, NUM_X, NUM_Y, NUM_T, s0, t, alpha, nu, beta, res );
 
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
