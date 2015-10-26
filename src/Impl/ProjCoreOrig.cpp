@@ -54,6 +54,7 @@ void   run_optimGPU(
     // and make default element of vector
     // Hoisted from "value"
     PrivGlobs    globs(numX, numY, numT);
+    DevicePrivGlobs d_globs(outer, numX, numY, numT);
     initGrid(s0, alpha, nu, t, numX, numY, numT, globs);
     initOperator(globs.myX,globs.myDxx);
     initOperator(globs.myY,globs.myDyy);

@@ -9,6 +9,55 @@
 
 using namespace std;
 
+struct DevicePrivGlobs {
+    // grid
+    REAL* myX; // [numX]
+    REAL* myY; // [numY]
+    REAL* myTimeline; // [numT]
+    unsigned myXindex;
+    unsigned myYindex;
+
+    // variable
+    REAL* myResult; // [numX*numY]
+
+    // coeffs
+    REAL* myVarX; // [numX*numY]
+    REAL* myVarY; // [numX*numY]
+
+    // operators
+    REAL*   myDxx; // [numX*4]
+    REAL*   myDyy; // [numY*4]
+
+    __device__ __host__ DevicePrivGlobs( ) {
+        printf("Invalid Contructor: need to provide the array sizes! EXITING...!\n");
+        exit(0);
+    }
+    __device__ __host__ DevicePrivGlobs( const unsigned int& outer,
+                                         const unsigned int& numX,
+                                         const unsigned int& numY,
+                                         const unsigned int& numT ) {
+        cudaMalloc((void**)&this->myX, sizeof(REAL)*outer*numX);
+        cudaMalloc((void**)&this->myY, sizeof(REAL)*outer*numY);
+        cudaMalloc((void**)&this->myTimeline, sizeof(REAL)*outer*numT);
+        cudaMalloc((void**)&this->myResult, sizeof(REAL)*outer*numX*numY);
+        cudaMalloc((void**)&this->myVarX, sizeof(REAL)*outer*numX*numY);
+        cudaMalloc((void**)&this->myVarY, sizeof(REAL)*outer*numX*numY);
+        cudaMalloc((void**)&this->myDxx, sizeof(REAL)*outer*numX*4);
+        cudaMalloc((void**)&this->myDyy, sizeof(REAL)*outer*numY*4);
+    }
+
+    __device__ __host__ ~DevicePrivGlobs() {
+        cudaFree(this->myX);
+        cudaFree(this->myY);
+        cudaFree(this->myTimeline);
+        cudaFree(this->myResult);
+        cudaFree(this->myVarX);
+        cudaFree(this->myVarY);
+        cudaFree(this->myDxx);
+        cudaFree(this->myDyy);
+    }
+
+} __attribute__ ((aligned (128)));
 
 struct PrivGlobs {
 
