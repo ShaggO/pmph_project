@@ -101,7 +101,7 @@ REAL   value(   PrivGlobs    globs,
                 const unsigned int numT
             );
 
-void run_OrigCPU(
+void run_optimGPU(
                 const unsigned int&   outer,
                 const unsigned int&   numX,
                 const unsigned int&   numY,

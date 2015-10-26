@@ -38,7 +38,7 @@ inline void tridag(
 #endif
 }
 
-void   run_OrigCPU(
+void   run_optimGPU(
                 const unsigned int&   outer,
                 const unsigned int&   numX,
                 const unsigned int&   numY,
@@ -72,6 +72,9 @@ void   run_OrigCPU(
         {
             for(unsigned k=0;k<globArr[i].myY.size();++k)
             {
+                // This could be computed once for each i,j, put in shared memory and
+                // read for each k
+                // Overhead of computing 0.001*i might be lower than accessing it in memory
                 globArr[i].myResult[j][k] = max(globArr[i].myX[j]-0.001*i, (REAL)0.0); // privatized one level in
             }
         }
@@ -84,6 +87,7 @@ void   run_OrigCPU(
         /**
          * updateParams function
          */
+        REAL time = globs.myTimeline[t];
         // Make 3D kernel for computing update of params for each outer loop
         // x: globs.myX, y: globs.myY, z: outer
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
@@ -92,11 +96,11 @@ void   run_OrigCPU(
                 for(unsigned k=0;k<globArr[i].myY.size();++k) {
                     globArr[i].myVarX[j][k] = exp(2.0*(  beta*log(globArr[i].myX[j])
                                 + globArr[i].myY[k]
-                                - 0.5*nu*nu*globArr[i].myTimeline[t] )
+                                - 0.5*nu*nu*time )
                             );
                     globArr[i].myVarY[j][k] = exp(2.0*(  alpha*log(globArr[i].myX[j])
                                 + globArr[i].myY[k]
-                                - 0.5*nu*nu*globArr[i].myTimeline[t] )
+                                - 0.5*nu*nu*time )
                             ); // nu*nu
                 }
             }
@@ -109,7 +113,7 @@ void   run_OrigCPU(
         REAL dtInv = 1.0/(globs.myTimeline[t+1]-globs.myTimeline[t]);
         vector<vector<vector<REAL> > > u(outer,vector<vector<REAL> >(numY, vector<REAL>(numX)));   // [outer][numY][numX]
         vector<vector<vector<REAL> > > v(outer,vector<vector<REAL> >(numX, vector<REAL>(numY)));   // [outer][numX][numY]
-        vector<vector<REAL> > a(outer,vector<REAL>(numZ)), b(outer,vector<REAL>(numZ)), c(outer,vector<REAL>(numZ)), y(outer,vector<REAL>(numZ));     // [outer][max(numX,numY)]
+        vector<vector<vector<REAL> > > a(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), b(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), c(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), y(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ)));     // [outer][max(numX,numY)]
         vector<vector<REAL> > yy(outer,vector<REAL>(numZ));  // temporary used in tridag  // [outer][max(numX,numY)]
 
         // 3D kernel
@@ -160,35 +164,69 @@ void   run_OrigCPU(
             }
         }
 
+        // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
             unsigned j, k;
             //	implicit x
             for(k=0;k<numY;k++) {
                 for(j=0;j<numX;j++) {  // here a, b,c should have size [numX]
-                    a[i][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0]);
-                    b[i][j] = dtInv - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1]);
-                    c[i][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2]);
+                    a[i][k][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0]);
+                    b[i][k][j] = dtInv - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1]);
+                    c[i][k][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2]);
                 }
-                // here yy should have size [numX]
-                tridag(a[i],b[i],c[i],u[i][k],numX,u[i][k],yy[i]);
             }
+        }
+
+        // 3D kernel
+        #pragma omp parallel for default(shared) schedule(static) if(outer>8)
+        for( unsigned i = 0; i < outer; ++ i ) {
+            unsigned k;
+            //	implicit x
+            for(k=0;k<numY;k++) {
+                // here yy should have size [numY][numX]
+                tridag(a[i][k],b[i][k],c[i][k],u[i][k],numX,u[i][k],yy[i]);
+            }
+        }
+
+        // 3D kernel
+        #pragma omp parallel for default(shared) schedule(static) if(outer>8)
+        for( unsigned i = 0; i < outer; ++i ) {
+            unsigned j, k;
 
             //	implicit y
             for(j=0;j<numX;j++) {
-                for(k=0;k<numY;k++) {  // here a, b, c should have size [numY]
-                    a[i][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0]);
-                    b[i][k] = dtInv - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1]);
-                    c[i][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2]);
+                for(k=0;k<numY;k++) {  // here a, b, c should have size [numX][numY]
+                    a[i][j][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0]);
+                    b[i][j][k] = dtInv - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1]);
+                    c[i][j][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2]);
                 }
-
-                for(k=0;k<numY;k++)
-                    y[i][k] = dtInv*u[i][k][j] - 0.5*v[i][j][k];
-
-                // here yy should have size [numY]
-                tridag(a[i],b[i],c[i],y[i],numY,globArr[i].myResult[j],yy[i]);
             }
-            // end rollback
+        }
+
+        // 3D kernel
+        #pragma omp parallel for default(shared) schedule(static) if(outer>8)
+        for( unsigned i = 0; i < outer; ++i ) {
+            unsigned j,k;
+            //	implicit y
+            for(j=0;j<numX;j++) {
+                for(k=0;k<numY;k++) {
+                    y[i][j][k] = dtInv*u[i][k][j] - 0.5*v[i][j][k];
+                }
+            }
+        }
+
+        // 3D kernel
+        #pragma omp parallel for default(shared) schedule(static) if(outer>8)
+        for( unsigned i = 0; i < outer; ++i ) {
+            unsigned j;
+
+            //	implicit y
+            for(j=0;j<numX;j++) {
+                // here yy should have size [numY]
+                tridag(a[i][j],b[i][j],c[i][j],y[i][j],numY,globArr[i].myResult[j],yy[i]);
+            }
+            // end rollback function
 
             if (t == 0) {
                 res[i] = globArr[i].myResult[globArr[i].myXindex][globArr[i].myYindex];
