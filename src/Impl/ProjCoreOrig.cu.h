@@ -63,6 +63,39 @@ void   run_optimGPU(
     initOperator(globs.myY,globs.myDyy);
     vector<PrivGlobs> globArr (outer, globs);
     deviceInitGrid<T>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs); 
+    REAL* line = (REAL*) malloc(sizeof(REAL)*numT);
+    REAL* myX = (REAL*) malloc(sizeof(REAL)*numX);
+    REAL* myY = (REAL*) malloc(sizeof(REAL)*numY);
+    cudaMemcpy(line,d_globs.myTimeline, sizeof(REAL)*numT,cudaMemcpyDeviceToHost);
+    cudaMemcpy(myX,d_globs.myX, sizeof(REAL)*numX,cudaMemcpyDeviceToHost);
+    cudaMemcpy(myY,d_globs.myY, sizeof(REAL)*numY,cudaMemcpyDeviceToHost);
+    bool succes = true;
+    for (int i = 1; i < numT; i++) {
+        if (abs(line[i]-globs.myTimeline[i]) > 1e-3) {
+            printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,line[i],globs.myTimeline[i]);
+            succes = false;
+            break;
+        }
+    }
+    for (int i = 1; i < numX; i++) {
+        if (abs(myX[i]-globs.myX[i]) > 1e-3) {
+            printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,myX[i],globs.myX[i]);
+            succes = false;
+            break;
+        }
+    }
+    for (int i = 1; i < numY; i++) {
+        if (abs(myY[i]-globs.myY[i]) > 1e-3) {
+            printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,myY[i],globs.myY[i]);
+            succes = false;
+            break;
+        }
+    }
+    if (succes) {
+        printf("Globs init well done!\n");
+    } else {
+        printf("Something something dark side!\n");
+    }
 
     unsigned numZ = max(numX,numY);
 

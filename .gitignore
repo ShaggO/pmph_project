@@ -4,6 +4,7 @@ src/OrigImpl/runproject
 src/Impl/runproject
 src/ParTridagCuda/test_tridag
 src/OrigImpl/Debug.txt
+src/Impl/Debug.txt
 
 *.aux
 *.glo

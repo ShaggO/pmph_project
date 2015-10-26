@@ -116,10 +116,6 @@ struct PrivGlobs {
 } __attribute__ ((aligned (128)));
 
 
-template<const unsigned T>
-void deviceInitGrid( const REAL s0, const REAL alpha, const REAL nu, const REAL t,
-        const unsigned outer, const unsigned numX, const unsigned numY, const unsigned numT, DevicePrivGlobs &globs);
-
 void initGrid(  const REAL s0, const REAL alpha, const REAL nu,const REAL t,
                 const unsigned numX, const unsigned numY, const unsigned numT, PrivGlobs& globs
             );
@@ -162,7 +158,8 @@ void deviceInitGrid( const REAL s0, const REAL alpha, const REAL nu, const REAL 
     const unsigned numZ = max(numX,max(numY,numT));
     const unsigned dimy = ceil((float) numZ / T);
     const unsigned dimx = ceil((float) outer / T);
-    const dim3 block(outer,numZ,1), grid(dimx,dimy,1);
+    const dim3 block(T,T,1), grid(dimx,dimy,1);
+
     const REAL stdX = 20.0*alpha*s0*sqrt(t);
     const REAL dx = stdX/numX;
 
@@ -173,8 +170,8 @@ void deviceInitGrid( const REAL s0, const REAL alpha, const REAL nu, const REAL 
     globs.myXindex = static_cast<unsigned>(s0/dx) % numX;
     globs.myYindex = static_cast<unsigned>(numY/2.0);
 
-    const REAL myXvar = globs.myXindex*dx+s0;
-    const REAL myYvar = globs.myYindex*dy+logAlpha;
+    const REAL myXvar = globs.myXindex*dx-s0;
+    const REAL myYvar = globs.myYindex*dy-logAlpha;
     // myTimeline, myXindex and myYindex for each outer
     initGridKernel<T><<<grid, block>>>(outer,numX,numY,numT,
             globs.myTimeline,globs.myX,globs.myY,
