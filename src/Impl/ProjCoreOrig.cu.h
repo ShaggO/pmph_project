@@ -209,9 +209,18 @@ void   run_optimGPU(
         REAL dtInv = 1.0/(globs.myTimeline[t+1]-globs.myTimeline[t]);
         vector<vector<vector<REAL> > > u(outer,vector<vector<REAL> >(numY, vector<REAL>(numX)));   // [outer][numY][numX]
         vector<vector<vector<REAL> > > v(outer,vector<vector<REAL> >(numX, vector<REAL>(numY)));   // [outer][numX][numY]
+        REAL *d_v, *d_u;
+        cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
+        cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
         vector<vector<vector<REAL> > > a(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), b(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), c(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), y(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ)));     // [outer][max(numX,numY)]
         vector<vector<REAL> > yy(outer,vector<REAL>(numZ));  // temporary used in tridag  // [outer][max(numX,numY)]
+        explicitX(outer, numX, numY, dtInv, v, u, d_globs);
+        REAL* h_v = (REAL*) malloc(sizeof(REAL)*outer*numY*numX);
+        REAL* h_u = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
+        cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
 
+        explicitY(outer, numX, numY, dtInv, v, u, d_globs);
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
@@ -234,7 +243,22 @@ void   run_optimGPU(
                 }
             }
         }
+        for( unsigned i = 0; i < outer; ++ i ) {
+            unsigned j,k;
+            for(j=0;j<numX;j++) {
+                for(k=0;k<numY;k++) {
+                    if (abs(u[i][k][j] - h_u[i*numX*numY + k*numY + j]) > 1e-2) {
+                        printf("WRONG!\n");
+                        succes = false;
+                    }
+                }
+            }
+        }
+        if (!succes) { break; }
 
+        explicitY(outer, numX, numY, dtInv, v, u, d_globs);
+        cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
