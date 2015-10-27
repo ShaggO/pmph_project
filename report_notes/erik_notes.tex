@@ -113,9 +113,10 @@ After this work, the program is in a state to distribute the various loops. Ther
 \subsubsection{The Idea}
 After loop distribution, we began to convert the loops to CUDA kernels. These kernels are copied almost directly from the already existing CPU code. This allowed us to begin using the GPU to run tridag.
 \subsubsection{The Work}
-For each function listed in the ProjHelperFun header file, a corresponding kernel was made, copied almost directly from the CPU code. The globs were initialized and copied to device memory, and 
+For each of the distributed loops, we designed a kernel around it. For example, 
+[Write one of the snippets we have converted!]
 \subsubsection{Correctness}
-
+Well, it's just direct translation
 \subsection{TRIDAG}
 \subsubsection{The Idea}
 \subsubsection{The Work}
