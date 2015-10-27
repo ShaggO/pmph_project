@@ -221,6 +221,45 @@ void deviceUpdateParams(
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
     REAL x = 0.5*nu*nu*time; 
     updateParamsKernel<T><<<grid, block>>>(outer, numX, numY, alpha, beta, x, globs.myX, globs.myY, globs.myVarX, globs.myVarY);
+}
+
+template<const unsigned T>
+void explicitX(
+        const unsigned outer,
+        const unsigned numX,
+        const unsigned numY,
+        const REAL dtInv,
+        REAL* v,
+        REAL* u,
+        DevicePrivGlobs &globs
+        )
+{
+    const unsigned dimx = ceil((float) numX / T);
+    const unsigned dimy = ceil((float) numY / T);
+    const unsigned dimz = ceil((float) outer / T);
+    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+
+    explicitXKernel<T><<<grid, block>>>(outer, numX, numY, v, u, globs.myVarX, globs.myResult, globs.myDxx);
+    cudaThreadSynchronize();
+}
+
+template<const unsigned T>
+void explicitY(
+        const unsigned outer,
+        const unsigned numX,
+        const unsigned numY,
+        const REAL dtInv,
+        REAL* v,
+        REAL* u,
+        DevicePrivGlobs &globs
+        )
+{
+    const unsigned dimx = ceil((float) numX / T);
+    const unsigned dimy = ceil((float) numY / T);
+    const unsigned dimz = ceil((float) outer / T);
+    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+
+    explicitYKernel<T><<<grid, block>>>(outer, numX, numY, v, u, globs.myVarY, globs.myResult, globs.myDyy);
     cudaThreadSynchronize();
 }
 
