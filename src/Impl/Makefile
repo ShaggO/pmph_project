@@ -10,7 +10,7 @@ HELPERS     =ProjHelperFun.cu.h ../include/Constants.h ../include/ParseInput.h .
 EXECUTABLE  =runproject
 
 
-default: compile
+default: clean compile run_small
 
 .cu.o: $(SOURCES_CPP) $(HELPERS)
 	$(CXX) $(CXXFLAGS) $(GPU_OPTS) $(INCLUDES) -c $@ $<

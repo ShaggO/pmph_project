@@ -156,8 +156,8 @@ template<const unsigned T>
 void deviceInitGrid( const REAL s0, const REAL alpha, const REAL nu, const REAL t,
         const unsigned outer, const unsigned numX, const unsigned numY, const unsigned numT, DevicePrivGlobs &globs) {
     const unsigned numZ = max(numX,max(numY,numT));
-    const unsigned dimy = ceil((float) numZ / T);
-    const unsigned dimx = ceil((float) outer / T);
+    const unsigned dimx = ceil(((float) outer) / T);
+    const unsigned dimy = ceil(((float) numZ) / T);
     const dim3 block(T,T,1), grid(dimx,dimy,1);
 
     const REAL stdX = 20.0*alpha*s0*sqrt(t);
@@ -176,6 +176,16 @@ void deviceInitGrid( const REAL s0, const REAL alpha, const REAL nu, const REAL 
     initGridKernel<T><<<grid, block>>>(outer,numX,numY,numT,
             globs.myTimeline,globs.myX,globs.myY,
             myXvar, myYvar, dx, dy, t);
+    cudaThreadSynchronize();
+}
+
+template<const unsigned T>
+void deviceInitOperator( const unsigned outer, const unsigned num,
+    REAL* x, REAL* Dxx) {
+    const unsigned dimx = ceil(((float) outer) / T);
+    const unsigned dimy = ceil(((float) num) / T);
+    const dim3 block(T,T,1), grid(dimx,dimy,1);
+    initOperatorKernel<T><<<grid, block>>>(outer,num,x,Dxx);
     cudaThreadSynchronize();
 }
 

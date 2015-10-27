@@ -42,4 +42,25 @@ __global__ void setPayoffKernel(
     }
 }
 
+template<const unsigned T>
+__global__ void initOperatorKernel(const unsigned outer, const unsigned num, REAL* x, REAL* Dxx) {
+    int i = blockIdx.x*T + threadIdx.x;
+    int j = blockIdx.y*T + threadIdx.y;
+    if (i < outer && j < num) {
+        int offset = i*(num*4)+j*4;
+        if (j == 0 || j == num-1) {
+            Dxx[offset] = 0.0;
+            Dxx[offset+1] = 0.0;
+            Dxx[offset+2] = 0.0;
+            Dxx[offset+3] = 0.0;
+        } else {
+            REAL dxl = x[j] - x[j-1];
+            REAL dxu = x[j+1] - x[j];
+            Dxx[offset] = 2.0/dxl/(dxl+dxu);
+            Dxx[offset+1] = -2.0*(1.0/dxl + 1.0/dxu)/(dxl+dxu);
+            Dxx[offset+2] = 2.0/dxu/(dxl+dxu);
+            Dxx[offset+3] = 0.0;
+        }
+    }
+}
 #endif //PROJ_KERNELS

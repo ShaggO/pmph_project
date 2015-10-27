@@ -63,32 +63,61 @@ void   run_optimGPU(
     initOperator(globs.myY,globs.myDyy);
     vector<PrivGlobs> globArr (outer, globs);
     deviceInitGrid<T>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs); 
+    deviceInitOperator<T>(outer, numX, d_globs.myX, d_globs.myDxx);
+    deviceInitOperator<T>(outer, numY, d_globs.myY, d_globs.myDyy);
     REAL* line = (REAL*) malloc(sizeof(REAL)*numT);
     REAL* myX = (REAL*) malloc(sizeof(REAL)*numX);
     REAL* myY = (REAL*) malloc(sizeof(REAL)*numY);
+    REAL* myDxx = (REAL*) malloc(sizeof(REAL)*numX*4);
+    REAL* myDyy = (REAL*) malloc(sizeof(REAL)*numY*4);
     cudaMemcpy(line,d_globs.myTimeline, sizeof(REAL)*numT,cudaMemcpyDeviceToHost);
     cudaMemcpy(myX,d_globs.myX, sizeof(REAL)*numX,cudaMemcpyDeviceToHost);
     cudaMemcpy(myY,d_globs.myY, sizeof(REAL)*numY,cudaMemcpyDeviceToHost);
+    cudaMemcpy(myDxx,d_globs.myDxx, sizeof(REAL)*numX*4,cudaMemcpyDeviceToHost);
+    cudaMemcpy(myDyy,d_globs.myDyy, sizeof(REAL)*numY*4,cudaMemcpyDeviceToHost);
     bool succes = true;
-    for (int i = 1; i < numT; i++) {
-        if (abs(line[i]-globs.myTimeline[i]) > 1e-3) {
+    printf("timeline:\n");
+    for (int i = 0; i < numT; i++) {
+        if (abs(line[i]-globs.myTimeline[i]) > 1e-6) {
             printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,line[i],globs.myTimeline[i]);
             succes = false;
             break;
         }
     }
-    for (int i = 1; i < numX; i++) {
-        if (abs(myX[i]-globs.myX[i]) > 1e-3) {
+    printf("myX:\n");
+    for (int i = 0; i < numX; i++) {
+        if (abs(myX[i]-globs.myX[i]) > 1e-6) {
             printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,myX[i],globs.myX[i]);
             succes = false;
             break;
         }
     }
-    for (int i = 1; i < numY; i++) {
-        if (abs(myY[i]-globs.myY[i]) > 1e-3) {
+    printf("myY:\n");
+    for (int i = 0; i < numY; i++) {
+        if (abs(myY[i]-globs.myY[i]) > 1e-6) {
             printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,myY[i],globs.myY[i]);
             succes = false;
             break;
+        }
+    }
+    printf("myDxx:\n");
+    for (int i = 0; i < numX; i++) {
+        for (int j = 0; j < 4; j++) {
+        if (abs(myDxx[i*4+j]-globs.myDxx[i][j]) > 1) {
+            printf("WRONG MOTHERFUCKER! %i,%i: %f != %f\n",i,j,myDxx[i*4+j],globs.myDxx[i][j]);
+            succes = false;
+            break;
+        }
+        }
+    }
+    printf("myDyy:\n");
+    for (int i = 0; i < numY; i++) {
+        for (int j = 0; j < 4; j++) {
+        if (abs(myDyy[i*4+j]-globs.myDyy[i][j]) > 1) {
+            printf("WRONG MOTHERFUCKER! %i,%i: %f != %f\n",i,j,myDyy[i*4+j],globs.myDyy[i][j]);
+            succes = false;
+            break;
+        }
         }
     }
     if (succes) {

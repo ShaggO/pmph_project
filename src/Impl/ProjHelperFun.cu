@@ -52,8 +52,8 @@ void initOperator(  const vector<REAL>& x,
 	REAL dxl, dxu;
 
 	//	lower boundary
-	dxl		 =  0.0;
-	dxu		 =  x[1] - x[0];
+	//dxl		 =  0.0;
+	//dxu		 =  x[1] - x[0];
 
 	Dxx[0][0] =  0.0;
 	Dxx[0][1] =  0.0;
@@ -73,8 +73,8 @@ void initOperator(  const vector<REAL>& x,
 	}
 
 	//	upper boundary
-	dxl		   =  x[n-1] - x[n-2];
-	dxu		   =  0.0;
+	//dxl		   =  x[n-1] - x[n-2];
+	//dxu		   =  0.0;
 
 	Dxx[n-1][0] = 0.0;
 	Dxx[n-1][1] = 0.0;
