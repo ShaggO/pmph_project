@@ -224,4 +224,20 @@ void deviceUpdateParams(
     cudaThreadSynchronize();
 }
 
+template<const unsigned T>
+void deviceImplicitX(const unsigned outer, const unsigned numX, const unsigned numY,
+        REAL dtInv,
+        DevicePrivGlobs &globs,
+        REAL* a,
+        REAL* b,
+        REAL* c)
+{
+    const unsigned dimx = ceil(((float) numX) / T);
+    const unsigned dimy = ceil(((float) numY) / T);
+    const unsigned dimz = ceil(((float) outer) / T);
+    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    implicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, globs.myVarX, globs.myDxx, a, b, c);
+    cudaThreadSynchronize();
+}
+
 #endif // PROJ_HELPER_FUNS
