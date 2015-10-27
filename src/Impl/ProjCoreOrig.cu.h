@@ -56,12 +56,14 @@ void   run_optimGPU(
     // Generate vector of globs. Initialize grid and operators onces
     // and make default element of vector
     // Hoisted from "value"
+    // CPU:
     PrivGlobs    globs(numX, numY, numT);
     DevicePrivGlobs d_globs(outer, numX, numY, numT);
     initGrid(s0, alpha, nu, t, numX, numY, numT, globs);
     initOperator(globs.myX,globs.myDxx);
     initOperator(globs.myY,globs.myDyy);
     vector<PrivGlobs> globArr (outer, globs);
+    // GPU:
     deviceInitGrid<T>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs); 
     deviceInitOperator<T>(outer, numX, d_globs.myX, d_globs.myDxx);
     deviceInitOperator<T>(outer, numY, d_globs.myY, d_globs.myDyy);
@@ -79,7 +81,7 @@ void   run_optimGPU(
     printf("timeline:\n");
     for (int i = 0; i < numT; i++) {
         if (abs(line[i]-globs.myTimeline[i]) > 1e-6) {
-            printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,line[i],globs.myTimeline[i]);
+            printf("WRONG! %i: %f != %f\n",i,line[i],globs.myTimeline[i]);
             succes = false;
             break;
         }
@@ -87,7 +89,7 @@ void   run_optimGPU(
     printf("myX:\n");
     for (int i = 0; i < numX; i++) {
         if (abs(myX[i]-globs.myX[i]) > 1e-6) {
-            printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,myX[i],globs.myX[i]);
+            printf("WRONG! %i: %f != %f\n",i,myX[i],globs.myX[i]);
             succes = false;
             break;
         }
@@ -95,7 +97,7 @@ void   run_optimGPU(
     printf("myY:\n");
     for (int i = 0; i < numY; i++) {
         if (abs(myY[i]-globs.myY[i]) > 1e-6) {
-            printf("WRONG MOTHERFUCKER! %i: %f != %f\n",i,myY[i],globs.myY[i]);
+            printf("WRONG! %i: %f != %f\n",i,myY[i],globs.myY[i]);
             succes = false;
             break;
         }
@@ -104,7 +106,7 @@ void   run_optimGPU(
     for (int i = 0; i < numX; i++) {
         for (int j = 0; j < 4; j++) {
         if (abs(myDxx[i*4+j]-globs.myDxx[i][j]) > 1) {
-            printf("WRONG MOTHERFUCKER! %i,%i: %f != %f\n",i,j,myDxx[i*4+j],globs.myDxx[i][j]);
+            printf("WRONG! %i,%i: %f != %f\n",i,j,myDxx[i*4+j],globs.myDxx[i][j]);
             succes = false;
             break;
         }
@@ -114,7 +116,7 @@ void   run_optimGPU(
     for (int i = 0; i < numY; i++) {
         for (int j = 0; j < 4; j++) {
         if (abs(myDyy[i*4+j]-globs.myDyy[i][j]) > 1) {
-            printf("WRONG MOTHERFUCKER! %i,%i: %f != %f\n",i,j,myDyy[i*4+j],globs.myDyy[i][j]);
+            printf("WRONG! %i,%i: %f != %f\n",i,j,myDyy[i*4+j],globs.myDyy[i][j]);
             succes = false;
             break;
         }
@@ -147,6 +149,19 @@ void   run_optimGPU(
         }
     }
     // end setPayoff
+    // GPU:
+    deviceSetPayoff<T>(outer, numX, numY, d_globs);
+
+    REAL* myResult = (REAL*) malloc(sizeof(REAL)*numX*numY);
+    cudaMemcpy(myResult,d_globs.myResult,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
+    for(unsigned j = 0;j<numX;++j) {
+        for(unsigned k = 0;k<numY;++k) {
+            if (abs(globArr[0].myResult[j][k] - myResult[j*numY+k]) > 1e-6) {
+                printf("WRONG!\n");
+            }
+        }
+    }
+
     // Value function inserted:
     for(int t = numT-2;t>=0;--t)
     {

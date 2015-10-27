@@ -31,14 +31,11 @@ __global__ void setPayoffKernel(
         REAL* myResult
         )
 {
-    int tidx = threadIdx.x;
-    int tidy = threadIdx.y;
-    int tidz = threadIdx.z;
-    int j = blockIdx.x*T + tidx; // myX.size
-    int k = blockIdx.y*T + tidy; // myY.size
-    int i = blockIdx.z*T + tidz; // outer
+    int i = blockIdx.z*T + threadIdx.z; // outer
+    int j = blockIdx.x*T + threadIdx.x; // myX.size
+    int k = blockIdx.y*T + threadIdx.y; // myY.size
     if (i < outer && j < numX && k < numY) {
-        myResult[i * numX*numY + j * numX + k] = max(myX[i * numX + j]-0.001*i, (REAL)0.0);
+        myResult[i * numX*numY + j * numY + k] = max(myX[i * numX + j]-0.001*i, (REAL)0.0);
     }
 }
 
