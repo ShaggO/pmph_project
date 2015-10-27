@@ -189,5 +189,22 @@ void deviceInitOperator( const unsigned outer, const unsigned num,
     cudaThreadSynchronize();
 }
 
+template<const unsigned T>
+void deviceSetPayoff(
+        const unsigned outer,
+        const unsigned numX,
+        const unsigned numY,
+        DevicePrivGlobs &globs
+        )
+{
+    const unsigned dimx = ceil((float) numX / T);
+    const unsigned dimy = ceil((float) numY / T);
+    const unsigned dimz = ceil((float) outer / T);
+    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+
+    setPayoffKernel<T><<<grid, block>>>(outer, numX, numY, globs.myX, globs.myResult);
+    cudaThreadSynchronize();
+}
+
 
 #endif // PROJ_HELPER_FUNS
