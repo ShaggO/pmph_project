@@ -40,7 +40,7 @@ inline void tridag(
     for(i=0; i<n; i++) u[i] = a[n-1-i];
 #endif
 }
-template<const unsigned T>
+template<const unsigned T2D,const unsigned T3D>
 void   run_optimGPU(
                 const unsigned int&   outer,
                 const unsigned int&   numX,
@@ -64,9 +64,9 @@ void   run_optimGPU(
     initOperator(globs.myY,globs.myDyy);
     vector<PrivGlobs> globArr (outer, globs);
     // GPU:
-    deviceInitGrid<T>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs); 
-    deviceInitOperator<T>(outer, numX, d_globs.myX, d_globs.myDxx);
-    deviceInitOperator<T>(outer, numY, d_globs.myY, d_globs.myDyy);
+    deviceInitGrid<T2D>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs); 
+    deviceInitOperator<T2D>(outer, numX, d_globs.myX, d_globs.myDxx);
+    deviceInitOperator<T2D>(outer, numY, d_globs.myY, d_globs.myDyy);
     REAL* line = (REAL*) malloc(sizeof(REAL)*numT);
     REAL* myX = (REAL*) malloc(sizeof(REAL)*numX);
     REAL* myY = (REAL*) malloc(sizeof(REAL)*numY);
@@ -150,13 +150,13 @@ void   run_optimGPU(
     }
     // end setPayoff
     // GPU:
-    deviceSetPayoff<T>(outer, numX, numY, d_globs);
+    deviceSetPayoff<T3D>(outer, numX, numY, d_globs);
 
     REAL* myResult = (REAL*) malloc(sizeof(REAL)*numX*numY);
     cudaMemcpy(myResult,d_globs.myResult,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
     for(unsigned j = 0;j<numX;++j) {
         for(unsigned k = 0;k<numY;++k) {
-            if (abs(globArr[0].myResult[j][k] - myResult[j*numY+k]) > 1e-6) {
+            if (abs(globArr[0].myResult[j][k] - myResult[j*numY+k]) > 1e-2) {
                 printf("WRONG!\n");
             }
         }
@@ -188,7 +188,21 @@ void   run_optimGPU(
             }
         }
         // end updateParams
+        deviceUpdateParams<T3D>(outer, numX, numY, alpha, beta, nu, time, d_globs);
 
+    REAL* myVarX = (REAL*) malloc(sizeof(REAL)*numX*numY);
+    cudaMemcpy(myVarX,d_globs.myVarX,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
+    REAL* myVarY = (REAL*) malloc(sizeof(REAL)*numX*numY);
+    cudaMemcpy(myVarY,d_globs.myVarY,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
+    for(unsigned j = 0;j<numX;++j) {
+        for(unsigned k = 0;k<numY;++k) {
+            if (abs(globArr[0].myVarX[j][k] - myVarX[j*numY+k]) > 1e-1) {
+                printf("Update params WRONG! %i,%i: %f != %f\n",j,k,myVarX[j*numY+k],globArr[0].myVarX[j][k]);
+                succes = false;
+            }
+        }
+    }
+    if (!succes) { break; }
         /**
          * Rollback function
          */
@@ -251,8 +265,8 @@ void   run_optimGPU(
         for( unsigned i = 0; i < outer; ++ i ) {
             unsigned j, k;
             //	implicit x
-            for(k=0;k<numY;k++) {
-                for(j=0;j<numX;j++) {  // here a, b,c should have size [numX]
+            for(j=0;j<numX;j++) {  // here a, b,c should have size [numX]
+                for(k=0;k<numY;k++) {
                     a[i][k][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0]);
                     b[i][k][j] = dtInv - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1]);
                     c[i][k][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2]);

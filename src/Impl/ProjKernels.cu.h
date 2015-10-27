@@ -60,4 +60,25 @@ __global__ void initOperatorKernel(const unsigned outer, const unsigned num, REA
         }
     }
 }
+
+template<const unsigned T>
+__global__ void updateParamsKernel(const unsigned outer, const unsigned numX, const unsigned numY,
+        REAL alpha, REAL beta, REAL sConst, 
+        REAL* myX,
+        REAL* myY,
+        REAL* myVarX,
+        REAL* myVarY) {
+    int i = blockIdx.z*T + threadIdx.z;
+    int j = blockIdx.x*T + threadIdx.x;
+    int k = blockIdx.y*T + threadIdx.y;
+    if (i < outer && j < numX && k < numY) {
+        int vIdx = i*(numX*numY)+j*numY+k;
+        REAL Xthis = log(myX[i*numX+j]);
+        REAL Ythis = myY[i*numY+k];
+
+        myVarX[vIdx] = exp(2.0*(  beta*Xthis + Ythis - sConst ));
+        myVarY[vIdx] = exp(2.0*(  alpha*Xthis + Ythis - sConst ));
+    }
+}
+
 #endif //PROJ_KERNELS

@@ -206,5 +206,22 @@ void deviceSetPayoff(
     cudaThreadSynchronize();
 }
 
+template<const unsigned T>
+void deviceUpdateParams(
+        const unsigned outer,
+        const unsigned numX,
+        const unsigned numY,
+        REAL alpha, REAL beta, REAL nu, REAL time,
+        DevicePrivGlobs &globs
+        )
+{
+    const unsigned dimx = ceil(((float) numX) / T);
+    const unsigned dimy = ceil(((float) numY) / T);
+    const unsigned dimz = ceil(((float) outer) / T);
+    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    REAL x = 0.5*nu*nu*time; 
+    updateParamsKernel<T><<<grid, block>>>(outer, numX, numY, alpha, beta, x, globs.myX, globs.myY, globs.myVarX, globs.myVarY);
+    cudaThreadSynchronize();
+}
 
 #endif // PROJ_HELPER_FUNS
