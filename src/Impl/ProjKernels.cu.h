@@ -21,4 +21,25 @@ __global__ void initGridKernel( const unsigned outer, const unsigned numX, const
         }
     }
 }
+
+template<const unsigned T>
+__global__ void setPayoffKernel(
+        const unsigned outer,
+        const unsigned numX,
+        const unsigned numY,
+        REAL* myX,
+        REAL* myResult
+        )
+{
+    int tidx = threadIdx.x;
+    int tidy = threadIdx.y;
+    int tidz = threadIdx.z;
+    int j = blockIdx.x*T + tidx; // myX.size
+    int k = blockIdx.y*T + tidy; // myY.size
+    int i = blockIdx.z*T + tidz; // outer
+    if (i < outer && j < numX && k < numY) {
+        myResult[i * numX*numY + j * numX + k] = max(myX[i * numX + j]-0.001*i, (REAL)0.0);
+    }
+}
+
 #endif //PROJ_KERNELS
