@@ -87,7 +87,6 @@ __global__ void explicitXKernel(
         const unsigned numX,
         const unsigned numY,
         const REAL dtInv,
-        REAL* v,
         REAL* u,
         REAL* myVarX,
         REAL* myResult,
@@ -98,21 +97,25 @@ __global__ void explicitXKernel(
     int j = blockIdx.x*T + threadIdx.x; // myX.size
     int k = blockIdx.y*T + threadIdx.y; // myY.size
 
+
     if (i < outer && j < numX && k < numY) {
         // u[outer][numY][numX]
-        int uindex = i*numY*numX + k*numY + j;
+        int uindex = i*numY*numX + k*numX + j;
+	// myResult[outer][numX][numY]
         u[uindex] = dtInv * myResult[i * numX*numY + j * numY + k];
 
+	// myVarX [outer][numX][numY]
         int myVarXindex = i*numX*numY + j * numY + k;
+	// Dxx [outer][numX][4]
         int Dxxindex = i*numX*4 + j*4;
         if (j > 0) {
-            u[uindex] += 0.5*( 0.5*myVarX[myVarXindex]*myDxx[Dxxindex] )
+            u[uindex] += 0.25*myVarX[myVarXindex]*myDxx[Dxxindex]
                             * myResult[i*numX*numY + (j-1)*numY + k];
         }
-        u[uindex] += 0.5*( 0.5*myVarX[myVarXindex]*myDxx[Dxxindex + 1] )
+        u[uindex] += 0.25*myVarX[myVarXindex]*myDxx[Dxxindex + 1]
                             * myResult[i*numX*numY + j*numY + k];
         if (j < numX) {
-            u[uindex] += 0.5*( 0.5*myVarX[myVarXindex]*myDxx[Dxxindex + 2] )
+            u[uindex] += 0.25*myVarX[myVarXindex]*myDxx[Dxxindex + 2]
                             * myResult[i*numX*numY + (j+1)*numY + k];
         }
     }
@@ -146,11 +149,11 @@ __global__ void explicitYKernel(
             v[vindex] +=  ( 0.5*myVarY[myVarYindex]*myDyy[Dyyindex] )
                 *  myResult[myResultindex-1];
         }
-        v[vindex]  +=   ( 0.5*globArr.myVarY[myVarYindex]*myDyy[Dyyindex + 1] )
-            *  myResult[myResultIndex];
+        v[vindex]  +=   ( 0.5*myVarY[myVarYindex]*myDyy[Dyyindex + 1] )
+            *  myResult[myResultindex];
         if(k < numY-1) {
             v[vindex] +=  ( 0.5*myVarY[myVarYindex]*myDyy[Dyyindex + 2] )
-                *  myResult[myResultIndex+1];
+                *  myResult[myResultindex+1];
         }
         u[i*numY*numX + k*numX + j] += v[vindex];
     }

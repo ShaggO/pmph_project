@@ -229,7 +229,6 @@ void explicitX(
         const unsigned numX,
         const unsigned numY,
         const REAL dtInv,
-        REAL* v,
         REAL* u,
         DevicePrivGlobs &globs
         )
@@ -239,7 +238,7 @@ void explicitX(
     const unsigned dimz = ceil((float) outer / T);
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
 
-    explicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, v, u, globs.myVarX, globs.myResult, globs.myDxx);
+    explicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, u, globs.myVarX, globs.myResult, globs.myDxx);
     cudaThreadSynchronize();
 }
 
