@@ -239,7 +239,7 @@ void explicitX(
     const unsigned dimz = ceil((float) outer / T);
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
 
-    explicitXKernel<T><<<grid, block>>>(outer, numX, numY, v, u, globs.myVarX, globs.myResult, globs.myDxx);
+    explicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, v, u, globs.myVarX, globs.myResult, globs.myDxx);
     cudaThreadSynchronize();
 }
 
@@ -259,7 +259,7 @@ void explicitY(
     const unsigned dimz = ceil((float) outer / T);
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
 
-    explicitYKernel<T><<<grid, block>>>(outer, numX, numY, v, u, globs.myVarY, globs.myResult, globs.myDyy);
+    explicitYKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, v, u, globs.myVarY, globs.myResult, globs.myDyy);
     cudaThreadSynchronize();
 }
 
