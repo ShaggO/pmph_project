@@ -7,6 +7,75 @@
 /**************************/
 /**** HELPER FUNCTIONS ****/
 /**************************/
+
+// Copy triple-nested vector togpu device array
+void cpCpu2Gpu(
+        vector<vector<vector<REAL > > >& src,
+        unsigned numX, unsigned numY, unsigned numZ,
+        REAL* dst) {
+    int mem_size = sizeof(REAL)*numX*numY*numZ;
+    // Allocate local flat array
+    REAL* local = (REAL*) malloc(mem_size);
+    for (int i = 0; i < numX; i++) {
+        for (int j = 0; j < numY; j++) {
+            // Copy each subarray into the flat array
+            memcpy((void*) &local[i*numY*numZ+j*numZ],(void*) &src[i][j][0], sizeof(REAL)*numZ);
+        }
+    }
+    // Copy flat array to device
+    cudaMemcpy(dst,local,mem_size,cudaMemcpyHostToDevice);
+    free(local);
+}
+
+// Copy glob vector to gpu device glob
+void cpGlob2Gpu(
+        vector<PrivGlobs>& globs,
+        unsigned outer,
+        unsigned numX,
+        unsigned numY,
+        unsigned numT,
+        DevicePrivGlobs &d_globs) {
+    // Allocate local flat array
+    REAL* myX =         (REAL*) malloc(sizeof(REAL)*outer*numX);
+    REAL* myY =         (REAL*) malloc(sizeof(REAL)*outer*numY);
+    REAL* myTimeline =  (REAL*) malloc(sizeof(REAL)*outer*numT);
+    REAL* myResult =    (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
+    REAL* myVarX =      (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
+    REAL* myVarY =      (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
+    REAL* myDxx =       (REAL*) malloc(sizeof(REAL)*outer*numX*4);
+    REAL* myDyy =       (REAL*) malloc(sizeof(REAL)*outer*numY*4);
+
+    // Copy each subarray into the flat arrays
+    for (int i = 0; i < outer; i++) {
+        memcpy(&myX[i*numX],&globs[i].myX[0],sizeof(REAL)*numX);
+        memcpy(&myY[i*numY],&globs[i].myY[0],sizeof(REAL)*numY);
+        memcpy(&myTimeline[i*numT],&globs[i].myTimeline[0],sizeof(REAL)*numT);
+        for (int j = 0; j < numX; j++) {
+            memcpy(&myResult[i*numX*numY+j*numY],&globs[i].myResult[j][0], sizeof(REAL)*numY);
+            memcpy(&myVarX[i*numX*numY+j*numY],&globs[i].myVarX[j][0], sizeof(REAL)*numY);
+            memcpy(&myVarY[i*numX*numY+j*numY],&globs[i].myVarY[j][0], sizeof(REAL)*numY);
+            memcpy(&myDxx[i*numX*4+j*4],&globs[i].myDxx[j][0],sizeof(REAL)*4);
+        }
+        for (int j = 0; j < numY; j++) {
+            memcpy(&myDyy[i*numY*4+j*4],&globs[i].myDyy[j][0],sizeof(REAL)*4);
+        }
+    }
+
+    // Copy flat array to device
+    cudaMemcpy(d_globs.myX,myX,sizeof(REAL)*outer*numX,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_globs.myY,myY,sizeof(REAL)*outer*numY,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_globs.myTimeline,myTimeline,sizeof(REAL)*outer*numT,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_globs.myResult,myResult,sizeof(REAL)*outer*numX*numY,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_globs.myVarX,myVarX,sizeof(REAL)*outer*numX*numY,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_globs.myVarY,myVarY,sizeof(REAL)*outer*numX*numY,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_globs.myDxx,myDxx,sizeof(REAL)*outer*numX*4,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_globs.myDyy,myDyy,sizeof(REAL)*outer*numY*4,cudaMemcpyHostToDevice);
+
+    // Clean up
+    free(myX);      free(myY);      free(myTimeline);
+    free(myResult); free(myVarX);   free(myVarY);
+    free(myDxx);    free(myDyy);
+}
 /**
  * Fills in:
  *   globs.myTimeline  of size [0..numT-1]

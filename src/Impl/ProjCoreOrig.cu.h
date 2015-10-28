@@ -40,6 +40,24 @@ inline void tridag(
     for(i=0; i<n; i++) u[i] = a[n-1-i];
 #endif
 }
+
+    /*
+void globs2gpu(vector<PrivGlobs> &globs, unsigned outer, unsigned numX, unsigned numY, DevicePrivGlobs &d_globs) {
+    REAL* local = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
+    for (int i = 0; i < outer; i++) {
+        for (int j = 0; j < numX; j++) {
+            memcpy(&dst[i*numX*numY+j*numY],&local[i*numX*numY+j*numY], sizeof(REAL)*numY);
+            cudaMemcpy(&dst[i*numX*numY+j*numY],&globs[i].[j][0], sizeof(REAL)*numY,cudaMemcpyDeviceToHost);
+        }
+    }
+    for (int i = 0; i < outer; i++) {
+        for (int j = 0; j < numX; j++) {
+            for (int k = 0; k < numX; k++) {
+            }
+        }
+    }
+}
+*/
 template<const unsigned T2D,const unsigned T3D>
 void   run_optimGPU(
                 const unsigned int&   outer,
@@ -64,9 +82,10 @@ void   run_optimGPU(
     initOperator(globs.myY,globs.myDyy);
     vector<PrivGlobs> globArr (outer, globs);
     // GPU:
-    deviceInitGrid<T2D>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs); 
+    deviceInitGrid<T2D>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs);
     deviceInitOperator<T2D>(outer, numX, d_globs.myX, d_globs.myDxx);
     deviceInitOperator<T2D>(outer, numY, d_globs.myY, d_globs.myDyy);
+//    cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
     REAL* line = (REAL*) malloc(sizeof(REAL)*numT);
     REAL* myX = (REAL*) malloc(sizeof(REAL)*numX);
     REAL* myY = (REAL*) malloc(sizeof(REAL)*numY);
@@ -80,7 +99,7 @@ void   run_optimGPU(
     bool succes = true;
     printf("timeline:\n");
     for (int i = 0; i < numT; i++) {
-        if (abs(line[i]-globs.myTimeline[i]) > 1e-6) {
+        if (abs(line[i]-globs.myTimeline[i]) > 1e-10) {
             printf("WRONG! %i: %f != %f\n",i,line[i],globs.myTimeline[i]);
             succes = false;
             break;
@@ -88,7 +107,7 @@ void   run_optimGPU(
     }
     printf("myX:\n");
     for (int i = 0; i < numX; i++) {
-        if (abs(myX[i]-globs.myX[i]) > 1e-6) {
+        if (abs(myX[i]-globs.myX[i]) > 1e-15) {
             printf("WRONG! %i: %f != %f\n",i,myX[i],globs.myX[i]);
             succes = false;
             break;
@@ -96,7 +115,7 @@ void   run_optimGPU(
     }
     printf("myY:\n");
     for (int i = 0; i < numY; i++) {
-        if (abs(myY[i]-globs.myY[i]) > 1e-6) {
+        if (abs(myY[i]-globs.myY[i]) > 1e-14) {
             printf("WRONG! %i: %f != %f\n",i,myY[i],globs.myY[i]);
             succes = false;
             break;
@@ -105,7 +124,7 @@ void   run_optimGPU(
     printf("myDxx:\n");
     for (int i = 0; i < numX; i++) {
         for (int j = 0; j < 4; j++) {
-        if (abs(myDxx[i*4+j]-globs.myDxx[i][j]) > 1) {
+        if (abs(myDxx[i*4+j]-globs.myDxx[i][j]) > 1e-9) {
             printf("WRONG! %i,%i: %f != %f\n",i,j,myDxx[i*4+j],globs.myDxx[i][j]);
             succes = false;
             break;
@@ -115,7 +134,7 @@ void   run_optimGPU(
     printf("myDyy:\n");
     for (int i = 0; i < numY; i++) {
         for (int j = 0; j < 4; j++) {
-        if (abs(myDyy[i*4+j]-globs.myDyy[i][j]) > 1) {
+        if (abs(myDyy[i*4+j]-globs.myDyy[i][j]) > 1e-9) {
             printf("WRONG! %i,%i: %f != %f\n",i,j,myDyy[i*4+j],globs.myDyy[i][j]);
             succes = false;
             break;
@@ -156,8 +175,8 @@ void   run_optimGPU(
     cudaMemcpy(myResult,d_globs.myResult,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
     for(unsigned j = 0;j<numX;++j) {
         for(unsigned k = 0;k<numY;++k) {
-            if (abs(globArr[0].myResult[j][k] - myResult[j*numY+k]) > 1e-2) {
-                printf("WRONG!\n");
+            if (abs(globArr[0].myResult[j][k] - myResult[j*numY+k]) > 1e-16) {
+                printf("Payoff WRONG! %i,%i: %f != %f\n",j,k,myResult[j*numY+k],globArr[0].myResult[j][k]);
             }
         }
     }
@@ -203,7 +222,7 @@ void   run_optimGPU(
         cudaMemcpy(myVarY,d_globs.myVarY,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
         for(unsigned j = 0;j<numX;++j) {
             for(unsigned k = 0;k<numY;++k) {
-                if (abs(globArr[0].myVarX[j][k] - myVarX[j*numY+k]) > 1e-1) {
+                if (abs(globArr[0].myVarX[j][k] - myVarX[j*numY+k]) > 1e-3) {
                     printf("Update params WRONG! %i,%i: %f != %f\n",j,k,myVarX[j*numY+k],globArr[0].myVarX[j][k]);
                     succes = false;
                 }
@@ -285,28 +304,33 @@ void   run_optimGPU(
         REAL* a1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         REAL* b1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         REAL* c1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
+//        cpCpu2Gpu(a,outer,numY,numX,d_a); // copy a to d_a
+//        cpCpu2Gpu(b,outer,numY,numX,d_b); // copy b to d_b
+//        cpCpu2Gpu(c,outer,numY,numX,d_c); // copy c to d_c
         cudaMemcpy(a1,d_a,sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         cudaMemcpy(b1,d_b,sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         cudaMemcpy(c1,d_c,sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
+        succes = true;
         printf("Time: %i\n",t);
         for(unsigned i = 0;i<outer;++i) {
-            for(unsigned j = 0;j<numX;++j) {
-                for(unsigned k = 0;k<numY;++k) {
-                    if (abs(a[i][k][j] - a1[i*(numX*numY)+k*numX+j]) > 1e-3) {
-                //        printf("Implicit X a WRONG! %i,%i,%i: %f != %f\n",i,k,j,a1[i*(numX*numY)+k*numX+j],a[i][k][j]);
+            for(unsigned k = 0;k<numY;++k) {
+                for(unsigned j = 0;j<numX;++j) {
+                    if (abs(a[i][k][j] - a1[i*(numX*numY)+k*numX+j]) > 1e-2) {
+                        printf("Implicit X a WRONG! %i,%i,%i: %f != %f\n",i,k,j,a1[i*(numX*numY)+k*numX+j],a[i][k][j]);
                         succes = false;
                     }
-                    if (abs(b[i][k][j] - b1[i*(numX*numY)+k*numX+j]) > 1e-3 && i == 0 && j == 0 && k < 100) {
-                //        printf("Implicit X b WRONG! %i,%i,%i: %f != %f\n",i,j,k,b1[i*(numX*numY)+k*numX+j],b[i][k][j]);
+                    if (abs(b[i][k][j] - b1[i*(numX*numY)+k*numX+j]) > 1e-2) {
+                        printf("Implicit X b WRONG! %i,%i,%i: %f != %f\n",i,j,k,b1[i*(numX*numY)+k*numX+j],b[i][k][j]);
                         succes = false;
                     }
-                    if (abs(c[i][j][k] - c1[i*(numX*numY)+j*numY+k]) > 1e-3) {
-                //        printf("Implicit X c WRONG! %i,%i,%i: %f != %f\n",i,j,k,c1[i*(numX*numY)+j*numY+k],c[i][j][k]);
+                    if (abs(c[i][k][j] - c1[i*(numX*numY)+k*numX+j]) > 1e-2) {
+                        printf("Implicit X c WRONG! %i,%i,%i: %f != %f\n",i,j,k,c1[i*(numX*numY)+k*numX+j],c[i][k][j]);
                         succes = false;
                     }
                 }
             }
         }
+        free(a1); free(b1); free(c1);
         if (!succes) { break; }
 
 

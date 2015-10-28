@@ -138,6 +138,18 @@ void tridag(
           vector<REAL>&   uu   // size [n] temporary
 );
 
+void cpCpu2Gpu(
+        vector<vector<vector<REAL> > >& src,
+        unsigned numX, unsigned numY, unsigned numZ,
+        REAL* dst);
+void cpGlob2Gpu(
+        vector<PrivGlobs>& globs,
+        unsigned outer,
+        unsigned numX,
+        unsigned numY,
+        unsigned numT,
+        DevicePrivGlobs &d_globs);
+
 void rollback( const unsigned g, PrivGlobs& globs );
 
 REAL   value(   PrivGlobs    globs,
