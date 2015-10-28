@@ -240,7 +240,7 @@ void   run_optimGPU(
 
         // GPU version
         REAL *d_v, *d_u;
-        cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
+        cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
         explicitX<T3D>(outer, numX, numY, dtInv, d_u, d_globs);
         REAL* h_v = (REAL*) malloc(sizeof(REAL)*numY*numX);
         REAL* h_u = (REAL*) malloc(sizeof(REAL)*numX*numY);
@@ -279,7 +279,7 @@ void   run_optimGPU(
         }
         if (!succes) { break;  }
 
-        /*cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
+        /*cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
         explicitY<T3D>(outer, numX, numY, dtInv, d_v, d_u, d_globs);
         cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
         cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);*/
