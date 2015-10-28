@@ -350,7 +350,7 @@ void   run_optimGPU(
         cudaMemcpy(c1,d_c,sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         succes = true;
         printf("Time: %i\n",t);
-        /*for(unsigned i = 0;i<outer;++i) {
+        for(unsigned i = 0;i<outer;++i) {
             for(unsigned k = 0;k<numY;++k) {
                 for(unsigned j = 0;j<numX;++j) {
                     if (abs(a[i][k][j] - a1[i*(numX*numY)+k*numX+j]) > 1e-6) {
@@ -367,13 +367,9 @@ void   run_optimGPU(
                     }
                 }
             }
-        }*/
-        free(a1); free(b1); free(c1);
+        }
         if (!succes) { break; }
 
-        cpCpu2Gpu(a,outer,numY,numX,d_a); // copy a to d_a
-        cpCpu2Gpu(b,outer,numY,numX,d_b); // copy b to d_b
-        cpCpu2Gpu(c,outer,numY,numX,d_c); // copy c to d_c
 
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
@@ -394,10 +390,9 @@ void   run_optimGPU(
             //	implicit y
             for(j=0;j<numX;j++) {
                 for(k=0;k<numY;k++) {  // here a, b, c should have size [numX][numY]
-                    a[i][j][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0]);
-                    b[i][j][k] = dtInv - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1]);
-                    c[i][j][k] =		 - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2]);
-                    y[i][j][k] = dtInv*u[i][k][j] - 0.5*v[i][j][k];
+                    a[i][j][k] =        - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][0]);
+                    b[i][j][k] = dtInv  - 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][1]);
+                    c[i][j][k] =		- 0.5*(0.5*globArr[i].myVarY[j][k]*globArr[i].myDyy[k][2]);
                 }
             }
         }
@@ -409,10 +404,46 @@ void   run_optimGPU(
             //	implicit y
             for(j=0;j<numX;j++) {
                 for(k=0;k<numY;k++) {
-                    ;
+                    y[i][j][k] = dtInv*u[i][k][j] - 0.5*v[i][j][k];
                 }
             }
         }
+        cpCpu2Gpu(a,outer,numX,numY,d_a); // copy a to d_a
+        cpCpu2Gpu(b,outer,numX,numY,d_b); // copy b to d_b
+        cpCpu2Gpu(c,outer,numX,numY,d_c); // copy c to d_c
+        cpCpu2Gpu(u,outer,numY,numX,d_u); // copy u to d_u
+        cpCpu2Gpu(v,outer,numX,numY,d_v); // copy v to d_v
+        deviceImplicitY<T3D>(outer, numX, numY, dtInv, d_globs,
+                d_a, d_b, d_c, d_u, d_v, d_y);
+
+        REAL* y1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY); // [outer][numX][nymY]
+        cudaMemcpy(a1,d_a, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
+        cudaMemcpy(b1,d_b, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
+        cudaMemcpy(c1,d_c, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
+        cudaMemcpy(y1,d_y, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
+        for (int i = 0; i < outer; i++) {
+            for (int j = 0; j < numX; j++) {
+                for (int k = 0; k < numY; k++) {
+                    if (abs(a[i][j][k] - a1[i*(numX*numY)+j*numY+k]) > 1e-6) {
+                        printf("Implicit Y a WRONG! %i,%i,%i: %f != %f\n",i,k,j,a1[i*(numX*numY)+j*numY+k],a[i][j][k]);
+                        succes = false;
+                    }
+                    if (abs(b[i][j][k] - b1[i*(numX*numY)+j*numY+k]) > 1e-6) {
+                        printf("Implicit Y b WRONG! %i,%i,%i: %f != %f\n",i,k,j,b1[i*(numX*numY)+j*numY+k],b[i][j][k]);
+                        succes = false;
+                    }
+                    if (abs(c[i][j][k] - c1[i*(numX*numY)+j*numY+k]) > 1e-6) {
+                        printf("Implicit Y c WRONG! %i,%i,%i: %f != %f\n",i,k,j,c1[i*(numX*numY)+j*numY+k],c[i][j][k]);
+                        succes = false;
+                    }
+                    if (abs(y[i][j][k] - y1[i*(numX*numY)+j*numY+k]) > 1e-6) {
+                        printf("Implicit Y y WRONG! %i,%i,%i: %f != %f\n",i,k,j,y1[i*(numX*numY)+j*numY+k],y[i][j][k]);
+                        succes = false;
+                    }
+                }
+            }
+        }
+        free(a1); free(b1); free(c1); free(y1);
 
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
