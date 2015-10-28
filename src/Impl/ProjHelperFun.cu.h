@@ -138,6 +138,18 @@ void tridag(
           vector<REAL>&   uu   // size [n] temporary
 );
 
+void cpCpu2Gpu(
+        vector<vector<vector<REAL> > >& src,
+        unsigned numX, unsigned numY, unsigned numZ,
+        REAL* dst);
+void cpGlob2Gpu(
+        vector<PrivGlobs>& globs,
+        unsigned outer,
+        unsigned numX,
+        unsigned numY,
+        unsigned numT,
+        DevicePrivGlobs &d_globs);
+
 void rollback( const unsigned g, PrivGlobs& globs );
 
 REAL   value(   PrivGlobs    globs,
@@ -259,6 +271,22 @@ void explicitY(
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
 
     explicitYKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, v, u, globs.myVarY, globs.myResult, globs.myDyy);
+    cudaThreadSynchronize();
+}
+
+template<const unsigned T>
+void deviceImplicitX(const unsigned outer, const unsigned numX, const unsigned numY,
+        REAL dtInv,
+        DevicePrivGlobs &globs,
+        REAL* a,
+        REAL* b,
+        REAL* c)
+{
+    const unsigned dimx = ceil(((float) numX) / T);
+    const unsigned dimy = ceil(((float) numY) / T);
+    const unsigned dimz = ceil(((float) outer) / T);
+    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    implicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, globs.myVarX, globs.myDxx, a, b, c);
     cudaThreadSynchronize();
 }
 

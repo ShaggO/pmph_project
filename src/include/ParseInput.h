@@ -60,6 +60,7 @@ bool is_pow2(int atr_val) {
 /********** READ DATA SET **********/
 /***********************************/
 
+#pragma diag_suppress boolean_controlling_expr_is_constant
 void readDataSet(   unsigned int& outer, 
                     unsigned int& num_X,
                     unsigned int& num_Y,
