@@ -196,6 +196,7 @@ void   run_optimGPU(
          * updateParams function
          */
         REAL time = globs.myTimeline[t];
+        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs);
         // Make 3D kernel for computing update of params for each outer loop
         // x: globs.myX, y: globs.myY, z: outer
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
@@ -331,20 +332,19 @@ void   run_optimGPU(
             //	implicit x
             for(j=0;j<numX;j++) {  // here a, b,c should have size [numX]
                 for(k=0;k<numY;k++) {
-                    a[i][k][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0]);
+                    a[i][k][j] =	   - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][0]);
                     b[i][k][j] = dtInv - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][1]);
-                    c[i][k][j] =		 - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2]);
+                    c[i][k][j] =	   - 0.5*(0.5*globArr[i].myVarX[j][k]*globArr[i].myDxx[j][2]);
                 }
             }
         }
+
+        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
         deviceImplicitX<T3D>(outer, numX, numY, dtInv, d_globs, d_a, d_b, d_c);
 
         REAL* a1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         REAL* b1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         REAL* c1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
-//        cpCpu2Gpu(a,outer,numY,numX,d_a); // copy a to d_a
-//        cpCpu2Gpu(b,outer,numY,numX,d_b); // copy b to d_b
-//        cpCpu2Gpu(c,outer,numY,numX,d_c); // copy c to d_c
         cudaMemcpy(a1,d_a,sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         cudaMemcpy(b1,d_b,sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         cudaMemcpy(c1,d_c,sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
@@ -353,15 +353,15 @@ void   run_optimGPU(
         /*for(unsigned i = 0;i<outer;++i) {
             for(unsigned k = 0;k<numY;++k) {
                 for(unsigned j = 0;j<numX;++j) {
-                    if (abs(a[i][k][j] - a1[i*(numX*numY)+k*numX+j]) > 1e-2) {
+                    if (abs(a[i][k][j] - a1[i*(numX*numY)+k*numX+j]) > 1e-6) {
                         printf("Implicit X a WRONG! %i,%i,%i: %f != %f\n",i,k,j,a1[i*(numX*numY)+k*numX+j],a[i][k][j]);
                         succes = false;
                     }
-                    if (abs(b[i][k][j] - b1[i*(numX*numY)+k*numX+j]) > 1e-2) {
-                        printf("Implicit X b WRONG! %i,%i,%i: %f != %f\n",i,j,k,b1[i*(numX*numY)+k*numX+j],b[i][k][j]);
+                    if (abs(b[i][k][j] - b1[i*(numX*numY)+k*numX+j]) > 1e-6) {
+                        printf("Implicit X b WRONG! %i,%i,%i: %f != %f\n",i,k,j,b1[i*(numX*numY)+k*numX+j],b[i][k][j]);
                         succes = false;
                     }
-                    if (abs(c[i][k][j] - c1[i*(numX*numY)+k*numX+j]) > 1e-2) {
+                    if (abs(c[i][k][j] - c1[i*(numX*numY)+k*numX+j]) > 1e-6) {
                         printf("Implicit X c WRONG! %i,%i,%i: %f != %f\n",i,j,k,c1[i*(numX*numY)+k*numX+j],c[i][k][j]);
                         succes = false;
                     }
@@ -371,6 +371,9 @@ void   run_optimGPU(
         free(a1); free(b1); free(c1);
         if (!succes) { break; }
 
+        cpCpu2Gpu(a,outer,numY,numX,d_a); // copy a to d_a
+        cpCpu2Gpu(b,outer,numY,numX,d_b); // copy b to d_b
+        cpCpu2Gpu(c,outer,numY,numX,d_c); // copy c to d_c
 
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)

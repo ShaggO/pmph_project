@@ -76,8 +76,8 @@ __global__ void updateParamsKernel(const unsigned outer, const unsigned numX, co
         REAL Xthis = log(myX[i*numX+j]);
         REAL Ythis = myY[i*numY+k];
 
-        myVarX[vIdx] = expf(2.0*(  beta*Xthis + Ythis - sConst ));
-        myVarY[vIdx] = expf(2.0*(  alpha*Xthis + Ythis - sConst ));
+        myVarX[vIdx] = exp(2.0*(  beta*Xthis + Ythis - sConst ));
+        myVarY[vIdx] = exp(2.0*(  alpha*Xthis + Ythis - sConst ));
     }
 }
 
@@ -96,10 +96,10 @@ __global__ void implicitXKernel(const unsigned outer, const unsigned numX, const
     if (i < outer && j < numX && k < numY) {
         int idx = i*(numX*numY)+k*numX+j;
         int idxDxx = i*(numX*4)+j*4;
-        REAL Xthis = 0.5*myVarX[i*(numX*numY)+j*numY+k];
-        a[idx] = -0.5*(Xthis*myDxx[idxDxx]);
-        b[idx] = dtInv - 0.5*(0.5*Xthis*myDxx[idxDxx+1]);
-        c[idx] = -0.5*(Xthis*myDxx[idxDxx+2]);
+        REAL Xthis = 0.25*myVarX[i*(numX*numY)+j*numY+k];
+        a[idx] =       - Xthis*myDxx[idxDxx];
+        b[idx] = dtInv - Xthis*myDxx[idxDxx+1];
+        c[idx] =       - Xthis*myDxx[idxDxx+2];
     }
 }
 
