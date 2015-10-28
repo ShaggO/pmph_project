@@ -70,6 +70,8 @@ void cpGlob2Gpu(
     cudaMemcpy(d_globs.myVarY,myVarY,sizeof(REAL)*outer*numX*numY,cudaMemcpyHostToDevice);
     cudaMemcpy(d_globs.myDxx,myDxx,sizeof(REAL)*outer*numX*4,cudaMemcpyHostToDevice);
     cudaMemcpy(d_globs.myDyy,myDyy,sizeof(REAL)*outer*numY*4,cudaMemcpyHostToDevice);
+    d_globs.myXindex = globs[0].myXindex;
+    d_globs.myYindex = globs[0].myYindex;
 
     // Clean up
     free(myX);      free(myY);      free(myTimeline);
