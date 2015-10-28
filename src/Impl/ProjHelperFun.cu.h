@@ -306,6 +306,7 @@ void deviceImplicitY(const unsigned outer, const unsigned numX, const unsigned n
     const unsigned dimz = ceil(((float) outer) / T);
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
     implicitYKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, globs.myVarY, globs.myDyy, a, b, c);
+    cudaThreadSynchronize();
     implicitYKernelY<T><<<grid, block>>>(outer, numX, numY, dtInv, u, v, y);
     cudaThreadSynchronize();
 }

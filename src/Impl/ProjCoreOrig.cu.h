@@ -408,6 +408,7 @@ void   run_optimGPU(
                 }
             }
         }
+        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs);
         cpCpu2Gpu(a,outer,numX,numY,d_a); // copy a to d_a
         cpCpu2Gpu(b,outer,numX,numY,d_b); // copy b to d_b
         cpCpu2Gpu(c,outer,numX,numY,d_c); // copy c to d_c
@@ -444,6 +445,7 @@ void   run_optimGPU(
             }
         }
         free(a1); free(b1); free(c1); free(y1);
+        return;
 
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
