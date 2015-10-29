@@ -244,9 +244,9 @@ void   run_optimGPU(
         cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
         cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
         explicitX<T3D>(outer, numX, numY, dtInv, d_u, d_globs);
-        REAL* h_v = (REAL*) malloc(sizeof(REAL)*numY*numX);
-        REAL* h_u = (REAL*) malloc(sizeof(REAL)*numX*numY);
-        cudaMemcpy(h_u,d_u, sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
+        REAL* h_v = (REAL*) malloc(sizeof(REAL)*outer*numY*numX);
+        REAL* h_u = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
+        cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
 
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
@@ -271,21 +271,23 @@ void   run_optimGPU(
             }
         }
         succes = true;
-        for(unsigned j=0;j<numX;j++) {
-            for(unsigned k=0;k<numY;k++) {
-                if (abs(u[0][k][j] - h_u[k*numX + j]) > 1e-6) {
-                    printf("ExplicitX: %i,%i,%i. %f != %f\n", 0, k, j, h_u[k*numX + j], u[0][k][j]);
-                    succes = false;
+        for (unsigned i=0;i<outer;i++) {
+            for(unsigned j=0;j<numX;j++) {
+                for(unsigned k=0;k<numY;k++) {
+                    if (abs(u[i][k][j] - h_u[i*numY*numX + k*numX + j]) > 1e-6) {
+                        printf("ExplicitX: %i,%i,%i. %f != %f\n", 0, k, j, h_u[i*numY*numX + k*numX + j], u[i][k][j]);
+                        succes = false;
+                    }
                 }
             }
         }
         if (!succes) { break;  }
 
         cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
-        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+        //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
         explicitY<T3D>(outer, numX, numY, dtInv, d_v, d_u, d_globs);
-        cudaMemcpy(h_v,d_v, sizeof(REAL)*numY*numX,cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_u,d_u, sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
@@ -311,15 +313,17 @@ void   run_optimGPU(
             }
         }
         succes = true;
-        for(unsigned j=0;j<numX;j++) {
-            for(unsigned k=0;k<numY;k++) {
-                if (abs(u[0][k][j] - h_u[k*numX + j]) > 1e-6) {
-                    printf("ExplicitX u: %i,%i,%i. %f != %f\n", 0, k, j, h_u[k*numX + j], u[0][k][j]);
-                    succes = false;
-                }
-                if (abs(v[0][j][k] - h_v[j*numY+k]) > 1e-6) {
-                    printf("ExplicitX v: %i,%i,%i. %f != %f\n", 0, k, j, h_v[k*numY + j], v[0][j][k]);
-                    succes = false;
+        for (unsigned i=0;i<outer;i++) {
+            for(unsigned j=0;j<numX;j++) {
+                for(unsigned k=0;k<numY;k++) {
+                    if (abs(u[i][k][j] - h_u[i*numY*numX + k*numX + j]) > 1e-6) {
+                        printf("ExplicitX u: %i,%i,%i. %f != %f\n", 0, k, j, h_u[i*numY*numX + k*numX + j], u[i][k][j]);
+                        succes = false;
+                    }
+                    if (abs(v[i][j][k] - h_v[i*numY*numX + j*numY+k]) > 1e-6) {
+                        printf("ExplicitX v: %i,%i,%i. %f != %f\n", 0, k, j, h_v[i*numY*numX + k*numY + j], v[i][j][k]);
+                        succes = false;
+                    }
                 }
             }
         }

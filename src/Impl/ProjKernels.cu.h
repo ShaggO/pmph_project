@@ -161,12 +161,12 @@ __global__ void explicitXKernel(
     if (i < outer && j < numX && k < numY) {
         // u[outer][numY][numX]
         int uindex = i*numY*numX + k*numX + j;
-	// myVarX [outer][numX][numY]
+        // myVarX [outer][numX][numY]
         int myVarXindex = i*numX*numY + j * numY + k;
-	// myResult[outer][numX][numY]
+        // myResult[outer][numX][numY]
         u[uindex] = dtInv * myResult[myVarXindex];
 
-	// Dxx [outer][numX][4]
+        // Dxx [outer][numX][4]
         int Dxxindex = i*numX*4 + j*4;
         REAL varX = 0.25*myVarX[myVarXindex];
         if (j > 0) {
@@ -213,6 +213,27 @@ __global__ void explicitYKernel(
             v[vindex] +=    varY*myDyy[Dyyindex+2] * myResult[vindex+1];
         }
         u[i*numY*numX + k*numX + j] += v[vindex];
+    }
+}
+
+template<const unsigned T>
+__global__ void sgmMatTransposeKernel( REAL* A, REAL* trA, int rowsA, int colsA ) {
+    __shared__ REAL tile[T][T+1];
+    int gidz = blockIdx.z*blockDim.z*threadIdx.z;
+    A += gidz*rowsA*colsA;
+    trA += gidz*rowsA*colsA;
+    // follows code for matrix transp in x & y
+    int tidx = threadIdx.x, tidy = threadIdx.y;
+    int j = blockIdx.x*T + tidx, i = blockIdx.y*T+tidy;
+    if ( j < colsA && i < rowsA ) {
+        tile[tidy][tidx] = A[i*colsA+j];
+    }
+    __syncthreads();
+
+    i = blockIdx.y*T+tidx;
+    j = blockIdx.x*T+tidy;
+    if ( j < colsA && i < rowsA ) {
+        trA[j*rowsA+i] = tile[tidx][tidy];
     }
 }
 #endif //PROJ_KERNELS

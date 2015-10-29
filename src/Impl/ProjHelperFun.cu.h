@@ -311,4 +311,13 @@ void deviceImplicitY(const unsigned outer, const unsigned numX, const unsigned n
     cudaThreadSynchronize();
 }
 
+template<const unsigned T>
+void sgmMatTranspose(REAL* A, REAL* trA, int outer, int rowsA, int colsA) {
+    const unsigned dimx = ceil(((float) colsA) / T);
+    const unsigned dimy = ceil(((float) rowsA) / T);
+    const unsigned dimz = ceil(((float) outer) / T);
+    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    sgmMatTransposeKernel<T><<<grid, block>>>(A, trA, rowsA, colsA);
+    cudaThreadSynchronize();
+}
 #endif // PROJ_HELPER_FUNS
