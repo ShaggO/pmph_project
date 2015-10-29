@@ -1,7 +1,6 @@
 #ifndef PROJ_KERNELS
 #define PROJ_KERNELS
 #include <stdlib.h>
-//#include "TridagKernel.cu.h"
 
 template<const unsigned T>
 __global__ void initGridKernel( const unsigned outer, const unsigned numX, const unsigned numY, const unsigned numT,
@@ -236,6 +235,21 @@ __global__ void sgmMatTransposeKernel( REAL* A, REAL* trA, int rowsA, int colsA 
     j = blockIdx.x*T+tidy;
     if ( j < colsA && i < rowsA ) {
         trA[j*rowsA+i] = tile[tidx][tidy];
+    }
+}
+
+template<const unsigned T>
+__global__ void resultKernel(
+        const unsigned outer,
+        const unsigned numX,
+        const unsigned numY,
+        const unsigned myXindex,
+        const unsigned myYindex,
+        REAL* myResult,
+        REAL* res) {
+    int gid = blockIdx.x*T+threadIdx.x;
+    if (gid < outer) {
+        res[gid] = myResult[gid*numX*numY+myXindex*numY+myYindex];
     }
 }
 #endif //PROJ_KERNELS

@@ -8,6 +8,7 @@
 #include "Constants.h"
 #include <cuda_runtime.h>
 #include "ProjKernels.cu.h"
+#include "TridagKernel.cu.h"
 
 using namespace std;
 
@@ -319,5 +320,52 @@ void sgmMatTranspose(REAL* A, REAL* trA, int outer, int rowsA, int colsA) {
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
     sgmMatTransposeKernel<T><<<grid, block>>>(A, trA, rowsA, colsA);
     cudaThreadSynchronize();
+}
+__global__ void
+TRIDAG_SOLVER(  REAL* a,
+                REAL* b,
+                REAL* c,
+                REAL* r,
+                const unsigned int n,
+                const unsigned int sgm_sz,
+                REAL* u,
+                REAL* uu
+);
+template<const unsigned block_size>
+void deviceTridag( REAL*   a,
+                        REAL*   b,
+                        REAL*   c,
+                        REAL*   r,
+                        const unsigned int n,
+                        const unsigned int sgm_sz,
+                        REAL*   u,
+                        REAL*   uu
+) {
+    unsigned int num_blocks;
+    unsigned int sh_mem_size = block_size * 32;
+
+    // assumes sgm_sz divides block_size
+    if((block_size % sgm_sz)!=0) {
+        printf("Invalid segment or block size. Exiting!\n\n!");
+        exit(0);
+    }
+    if((n % sgm_sz)!=0) {
+        printf("Invalid total size (not a multiple of segment size). Exiting!\n\n!");
+        exit(0);
+    }
+    num_blocks = (n + (block_size - 1)) / block_size;
+    TRIDAG_SOLVER<<< num_blocks, block_size, sh_mem_size >>>(a, b, c, r, n, sgm_sz, u, uu);
+    cudaThreadSynchronize();
+}
+
+template<const unsigned block_size>
+void deviceResult( const unsigned outer, const unsigned numX, const unsigned numY,
+        DevicePrivGlobs &globs, REAL* res) {
+    unsigned num_blocks = ceil((float)outer / block_size);
+    REAL* d_res;
+    cudaMalloc((void**) &d_res, sizeof(REAL)*outer);
+    resultKernel<block_size><<<num_blocks, block_size>>>(outer,numX,numY,globs.myXindex,globs.myYindex,globs.myResult,d_res);
+    cudaMemcpy(res, d_res, sizeof(REAL)*outer,cudaMemcpyDeviceToHost);
+    cudaFree(d_res);
 }
 #endif // PROJ_HELPER_FUNS

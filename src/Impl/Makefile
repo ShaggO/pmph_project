@@ -6,7 +6,7 @@ INCLUDES    += -I ../include
 GPU_OPTS   = -D lgWARP=5
 
 SOURCES_CPP =ProjectMain.cu ProjHelperFun.cu
-HELPERS     =ProjHelperFun.cu.h ../include/Constants.h ../include/ParseInput.h ../include/ParserC.h ../include/OpenmpUtil.h ProjCoreOrig.cu.h ProjKernels.cu.h
+HELPERS     =ProjHelperFun.cu.h ../include/Constants.h ../include/ParseInput.h ../include/ParserC.h ../include/OpenmpUtil.h ProjCoreOrig.cu.h ProjKernels.cu.h TridagKernel.cu.h
 EXECUTABLE  =runproject
 
 
@@ -15,7 +15,7 @@ default: clean compile run_small
 .cu.o: $(SOURCES_CPP) $(HELPERS)
 	$(CXX) $(CXXFLAGS) $(GPU_OPTS) $(INCLUDES) -c $@ $<
 
-compile: $(EXECUTABLE) $(HELPERS) $(SOURCES_CPP)
+compile: $(EXECUTABLE)
 $(EXECUTABLE): 
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(EXECUTABLE) $(SOURCES_CPP)
 
