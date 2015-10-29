@@ -1,6 +1,7 @@
 #ifndef PROJ_KERNELS
 #define PROJ_KERNELS
 #include <stdlib.h>
+//#include "TridagKernel.cu.h"
 
 template<const unsigned T>
 __global__ void initGridKernel( const unsigned outer, const unsigned numX, const unsigned numY, const unsigned numT,
@@ -31,9 +32,9 @@ __global__ void setPayoffKernel(
         REAL* myResult
         )
 {
-    int i = blockIdx.z*T + threadIdx.z; // outer
-    int j = blockIdx.x*T + threadIdx.x; // myX.size
-    int k = blockIdx.y*T + threadIdx.y; // myY.size
+    int i = blockIdx.x*T + threadIdx.x; // outer
+    int j = blockIdx.y*T + threadIdx.y; // myX.size
+    int k = blockIdx.z*T + threadIdx.z; // myY.size
     if (i < outer && j < numX && k < numY) {
         myResult[i * numX*numY + j * numY + k] = max(myX[i * numX + j]-0.001*i, (REAL)0.0);
     }
@@ -63,14 +64,14 @@ __global__ void initOperatorKernel(const unsigned outer, const unsigned num, REA
 
 template<const unsigned T>
 __global__ void updateParamsKernel(const unsigned outer, const unsigned numX, const unsigned numY,
-        REAL alpha, REAL beta, REAL sConst, 
+        REAL alpha, REAL beta, REAL sConst,
         REAL* myX,
         REAL* myY,
         REAL* myVarX,
         REAL* myVarY) {
-    int i = blockIdx.z*T + threadIdx.z;
-    int j = blockIdx.x*T + threadIdx.x;
-    int k = blockIdx.y*T + threadIdx.y;
+    int i = blockIdx.x*T + threadIdx.x;
+    int j = blockIdx.y*T + threadIdx.y;
+    int k = blockIdx.z*T + threadIdx.z;
     if (i < outer && j < numX && k < numY) {
         int vIdx = i*(numX*numY)+j*numY+k;
         REAL Xthis = log(myX[i*numX+j]);
@@ -81,65 +82,6 @@ __global__ void updateParamsKernel(const unsigned outer, const unsigned numX, co
     }
 }
 
-template<const unsigned T>
-__global__ void implicitXKernel(const unsigned outer, const unsigned numX, const unsigned numY,
-        REAL dtInv,
-        REAL* myVarX,
-        REAL* myDxx,
-        REAL* a,
-        REAL* b,
-        REAL* c)
-{
-    int i = blockIdx.z*T + threadIdx.z;
-    int j = blockIdx.x*T + threadIdx.x;
-    int k = blockIdx.y*T + threadIdx.y;
-    if (i < outer && j < numX && k < numY) {
-        int idx = i*(numX*numY)+k*numX+j;
-        int idxDxx = i*(numX*4)+j*4;
-        REAL Xthis = 0.25*myVarX[i*(numX*numY)+j*numY+k];
-        a[idx] =       - Xthis*myDxx[idxDxx];
-        b[idx] = dtInv - Xthis*myDxx[idxDxx+1];
-        c[idx] =       - Xthis*myDxx[idxDxx+2];
-    }
-}
-
-template<const unsigned T>
-__global__ void implicitYKernel(const unsigned outer, const unsigned numX, const unsigned numY,
-        REAL dtInv,
-        REAL* myVarY,
-        REAL* myDyy,
-        REAL* a,
-        REAL* b,
-        REAL* c)
-{
-    int i = blockIdx.z*T + threadIdx.z;
-    int j = blockIdx.x*T + threadIdx.x;
-    int k = blockIdx.y*T + threadIdx.y;
-    if (i < outer && j < numX && k < numY) {
-        int idx = i*(numX*numY)+j*numY+k;
-        int idxDyy = i*(numY*4)+k*4;
-        REAL Ythis = 0.25*myVarY[i*numX*numY+j*numY+k];
-        a[idx] =       - Ythis*myDyy[idxDyy];
-        b[idx] = dtInv - Ythis*myDyy[idxDyy+1];
-        c[idx] =       - Ythis*myDyy[idxDyy+2];
-    }
-}
-
-template<const unsigned T>
-__global__ void implicitYKernelY(const unsigned outer, const unsigned numX, const unsigned numY,
-        REAL dtInv,
-        REAL* u,
-        REAL* v,
-        REAL* y)
-{
-    int i = blockIdx.z*T + threadIdx.z;
-    int j = blockIdx.x*T + threadIdx.x;
-    int k = blockIdx.y*T + threadIdx.y;
-    if (i < outer && j < numX && k < numY) {
-        int idx = i*numX*numY+j*numY+k;
-        y[idx] = dtInv*u[i*numX*numY+k*numX+j] - 0.5*v[idx];
-    }
-}
 
 template<const unsigned T>
 __global__ void explicitXKernel(
@@ -153,9 +95,9 @@ __global__ void explicitXKernel(
         REAL* myDxx
         )
 {
-    int i = blockIdx.z*T + threadIdx.z; // outer
-    int j = blockIdx.x*T + threadIdx.x; // myX.size
-    int k = blockIdx.y*T + threadIdx.y; // myY.size
+    int i = blockIdx.x*T + threadIdx.x; // outer
+    int j = blockIdx.y*T + threadIdx.y; // myX.size
+    int k = blockIdx.z*T + threadIdx.z; // myY.size
 
 
     if (i < outer && j < numX && k < numY) {
@@ -195,9 +137,9 @@ __global__ void explicitYKernel(
         REAL* myDyy
         )
 {
-    int i = blockIdx.z*T + threadIdx.z; // outer
-    int j = blockIdx.x*T + threadIdx.x; // myX.size
-    int k = blockIdx.y*T + threadIdx.y; // myY.size
+    int i = blockIdx.x*T + threadIdx.x; // outer
+    int j = blockIdx.y*T + threadIdx.y; // myX.size
+    int k = blockIdx.z*T + threadIdx.z; // myY.size
     if (i < outer && j < numX && k < numY) {
         // v[outer][numX][numY]
         int vindex = i*numX*numY + j*numY + k;
@@ -213,6 +155,66 @@ __global__ void explicitYKernel(
             v[vindex] +=    varY*myDyy[Dyyindex+2] * myResult[vindex+1];
         }
         u[i*numY*numX + k*numX + j] += v[vindex];
+    }
+}
+
+template<const unsigned T>
+__global__ void implicitXKernel(const unsigned outer, const unsigned numX, const unsigned numY,
+        REAL dtInv,
+        REAL* myVarX,
+        REAL* myDxx,
+        REAL* a,
+        REAL* b,
+        REAL* c)
+{
+    int i = blockIdx.x*T + threadIdx.x;
+    int j = blockIdx.y*T + threadIdx.y;
+    int k = blockIdx.z*T + threadIdx.z;
+    if (i < outer && j < numX && k < numY) {
+        int idx = i*(numX*numY)+k*numX+j;
+        int idxDxx = i*(numX*4)+j*4;
+        REAL Xthis = 0.25*myVarX[i*(numX*numY)+j*numY+k];
+        a[idx] =       - Xthis*myDxx[idxDxx];
+        b[idx] = dtInv - Xthis*myDxx[idxDxx+1];
+        c[idx] =       - Xthis*myDxx[idxDxx+2];
+    }
+}
+
+template<const unsigned T>
+__global__ void implicitYKernel(const unsigned outer, const unsigned numX, const unsigned numY,
+        REAL dtInv,
+        REAL* myVarY,
+        REAL* myDyy,
+        REAL* a,
+        REAL* b,
+        REAL* c)
+{
+    int i = blockIdx.x*T + threadIdx.x;
+    int j = blockIdx.y*T + threadIdx.y;
+    int k = blockIdx.z*T + threadIdx.z;
+    if (i < outer && j < numX && k < numY) {
+        int idx = i*(numX*numY)+j*numY+k;
+        int idxDyy = i*(numY*4)+k*4;
+        REAL Ythis = 0.25*myVarY[i*numX*numY+j*numY+k];
+        a[idx] =       - Ythis*myDyy[idxDyy];
+        b[idx] = dtInv - Ythis*myDyy[idxDyy+1];
+        c[idx] =       - Ythis*myDyy[idxDyy+2];
+    }
+}
+
+template<const unsigned T>
+__global__ void implicitYKernelY(const unsigned outer, const unsigned numX, const unsigned numY,
+        REAL dtInv,
+        REAL* u,
+        REAL* v,
+        REAL* y)
+{
+    int i = blockIdx.x*T + threadIdx.x;
+    int j = blockIdx.y*T + threadIdx.y;
+    int k = blockIdx.z*T + threadIdx.z;
+    if (i < outer && j < numX && k < numY) {
+        int idx = i*numX*numY+j*numY+k;
+        y[idx] = dtInv*u[i*numX*numY+k*numX+j] - 0.5*v[idx];
     }
 }
 

@@ -85,7 +85,8 @@ void   run_optimGPU(
     deviceInitGrid<T2D>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs);
     deviceInitOperator<T2D>(outer, numX, d_globs.myX, d_globs.myDxx);
     deviceInitOperator<T2D>(outer, numY, d_globs.myY, d_globs.myDyy);
-//    cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+
+    // Test code:
     REAL* line = (REAL*) malloc(sizeof(REAL)*numT);
     REAL* myX = (REAL*) malloc(sizeof(REAL)*numX);
     REAL* myY = (REAL*) malloc(sizeof(REAL)*numY);
@@ -124,11 +125,11 @@ void   run_optimGPU(
     printf("myDxx:\n");
     for (int i = 0; i < numX; i++) {
         for (int j = 0; j < 4; j++) {
-        if (abs(myDxx[i*4+j]-globs.myDxx[i][j]) > 1) {
-            printf("WRONG! %i,%i: %f != %f\n",i,j,myDxx[i*4+j],globs.myDxx[i][j]);
-            succes = false;
-            break;
-        }
+            if (abs(myDxx[i*4+j]-globs.myDxx[i][j]) > 1) {
+                printf("WRONG! %i,%i: %f != %f\n",i,j,myDxx[i*4+j],globs.myDxx[i][j]);
+                succes = false;
+                break;
+            }
         }
     }
     printf("myDyy:\n");
@@ -141,6 +142,7 @@ void   run_optimGPU(
         }
         }
     }
+    free(line); free(myX); free(myY); free(myDxx); free(myDyy);
     if (succes) {
         printf("Globs init well done!\n");
     } else {
@@ -449,7 +451,6 @@ void   run_optimGPU(
             }
         }
         free(a1); free(b1); free(c1); free(y1);
-        return;
 
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)

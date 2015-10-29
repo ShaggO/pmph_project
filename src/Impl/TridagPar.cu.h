@@ -1,3 +1,5 @@
+#ifndef TRIDAG_H
+#define TRIDAG_H
 template<class OP>
 void inplaceScanInc(const int n, typename OP::BaseType* inpres) {
   typename OP::BaseType acc = OP::identity();//inpres[0];
@@ -69,3 +71,4 @@ inline void tridagPar(
     free(mats); 
 }
 
+#endif
