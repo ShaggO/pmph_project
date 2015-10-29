@@ -283,8 +283,8 @@ void deviceImplicitX(const unsigned outer, const unsigned numX, const unsigned n
         REAL* c)
 {
     const unsigned dimx = ceil(((float) outer) / T);
-    const unsigned dimy = ceil(((float) numX) / T);
-    const unsigned dimz = ceil(((float) numY) / T);
+    const unsigned dimy = ceil(((float) numY) / T);
+    const unsigned dimz = ceil(((float) numX) / T);
     const dim3 block(T,T,T), grid(dimx,dimy,dimz);
     implicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, globs.myVarX, globs.myDxx, a, b, c);
     cudaThreadSynchronize();

@@ -110,15 +110,15 @@ __global__ void explicitXKernel(
 
         // Dxx [outer][numX][4]
         int Dxxindex = i*numX*4 + j*4;
-        REAL varX = 0.25*myVarX[myVarXindex];
+        REAL varX = myVarX[myVarXindex];
         if (j > 0) {
-            u[uindex] +=    varX*myDxx[Dxxindex]
+            u[uindex] +=    0.5*(0.5*varX*myDxx[Dxxindex])
                                 * myResult[i*numX*numY + (j-1)*numY + k];
         }
-        u[uindex] +=        varX*myDxx[Dxxindex+1]
+        u[uindex] +=        0.5*(0.5*varX*myDxx[Dxxindex+1])
                                 * myResult[myVarXindex];
         if (j < numX) {
-            u[uindex] +=    varX*myDxx[Dxxindex+2]
+            u[uindex] +=    0.5*(0.5*varX*myDxx[Dxxindex+2])
                                 * myResult[i*numX*numY + (j+1)*numY + k];
         }
     }
@@ -146,13 +146,13 @@ __global__ void explicitYKernel(
         v[vindex] = 0.0;
 
         int Dyyindex = i*numY*4 + k*4;
-        REAL varY = 0.5*myVarY[vindex];
+        REAL varY = myVarY[vindex];
         if(k > 0) {
-            v[vindex] +=    varY*myDyy[Dyyindex]   * myResult[vindex-1];
+            v[vindex] +=    (0.5*varY*myDyy[Dyyindex])   * myResult[vindex-1];
         }
-        v[vindex]  +=       varY*myDyy[Dyyindex+1] * myResult[vindex];
+        v[vindex]  +=       (0.5*varY*myDyy[Dyyindex+1]) * myResult[vindex];
         if(k < numY-1) {
-            v[vindex] +=    varY*myDyy[Dyyindex+2] * myResult[vindex+1];
+            v[vindex] +=    (0.5*varY*myDyy[Dyyindex+2]) * myResult[vindex+1];
         }
         u[i*numY*numX + k*numX + j] += v[vindex];
     }
@@ -168,8 +168,8 @@ __global__ void implicitXKernel(const unsigned outer, const unsigned numX, const
         REAL* c)
 {
     int i = blockIdx.x*T + threadIdx.x;
-    int j = blockIdx.y*T + threadIdx.y;
-    int k = blockIdx.z*T + threadIdx.z;
+    int k = blockIdx.y*T + threadIdx.y;
+    int j = blockIdx.z*T + threadIdx.z;
     if (i < outer && j < numX && k < numY) {
         int idx = i*(numX*numY)+k*numX+j;
         int idxDxx = i*(numX*4)+j*4;

@@ -276,8 +276,8 @@ void   run_optimGPU(
         for (unsigned i=0;i<outer;i++) {
             for(unsigned j=0;j<numX;j++) {
                 for(unsigned k=0;k<numY;k++) {
-                    if (abs(u[i][k][j] - h_u[i*numY*numX + k*numX + j]) > 1e-6) {
-                        printf("ExplicitX: %i,%i,%i. %f != %f\n", 0, k, j, h_u[i*numY*numX + k*numX + j], u[i][k][j]);
+                    if (abs(u[i][k][j] - h_u[i*numY*numX + k*numX + j]) > 1e-5) {
+                        printf("ExplicitX: %i,%i,%i. %f != %f\n", i, k, j, h_u[i*numY*numX + k*numX + j], u[i][k][j]);
                         succes = false;
                     }
                 }
@@ -286,7 +286,7 @@ void   run_optimGPU(
         if (!succes) { break;  }
 
         cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
-        //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
         explicitY<T3D>(outer, numX, numY, dtInv, d_v, d_u, d_globs);
         cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
         cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
@@ -318,12 +318,12 @@ void   run_optimGPU(
         for (unsigned i=0;i<outer;i++) {
             for(unsigned j=0;j<numX;j++) {
                 for(unsigned k=0;k<numY;k++) {
-                    if (abs(u[i][k][j] - h_u[i*numY*numX + k*numX + j]) > 1e-6) {
-                        printf("ExplicitX u: %i,%i,%i. %f != %f\n", 0, k, j, h_u[i*numY*numX + k*numX + j], u[i][k][j]);
+                    if (abs(u[i][k][j] - h_u[i*numY*numX + k*numX + j]) > 1e-5) {
+                        printf("ExplicitY u: %i,%i,%i. %f != %f\n", i, k, j, h_u[i*numY*numX + k*numX + j], u[i][k][j]);
                         succes = false;
                     }
                     if (abs(v[i][j][k] - h_v[i*numY*numX + j*numY+k]) > 1e-6) {
-                        printf("ExplicitX v: %i,%i,%i. %f != %f\n", 0, k, j, h_v[i*numY*numX + k*numY + j], v[i][j][k]);
+                        printf("ExplicitY v: %i,%i,%i. %f != %f\n", i, k, j, h_v[i*numY*numX + k*numY + j], v[i][j][k]);
                         succes = false;
                     }
                 }
