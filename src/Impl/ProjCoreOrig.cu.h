@@ -71,8 +71,15 @@ void   run_optimGPU(
                 const REAL&           beta,
                       REAL*           res   // [outer] RESULT
 ) {
+
+    unsigned long int e_initGrid, e_initOp, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res;
+    e_initGrid = 0; e_initOp = 0; e_payoff = 0; e_update = 0;
+    e_eX = 0; e_eY = 0; e_iX = 0; e_triX = 0; e_iY = 0;
+    e_triY = 0; e_res = 0;
+    struct timeval t_start, t_end, t_diff;
+    gettimeofday(&t_start, NULL);
     // Generate vector of globs. Initialize grid and operators onces
-    // and make default element of vector
+    // make default element of vector
     // Hoisted from "value"
     // CPU:
     /*
@@ -84,9 +91,19 @@ void   run_optimGPU(
     */
     // GPU:
     DevicePrivGlobs d_globs(outer, numX, numY, numT);
+
+    gettimeofday(&t_start, NULL);
     deviceInitGrid<T2D>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs);
+    gettimeofday(&t_end, NULL);
+    timeval_subtract(&t_diff, &t_end, &t_start);
+    e_initGrid += (t_diff.tv_sec*1e6+t_diff.tv_usec);
+
+    gettimeofday(&t_start, NULL);
     deviceInitOperator<T2D>(outer, numX, d_globs.myX, d_globs.myDxx);
     deviceInitOperator<T2D>(outer, numY, d_globs.myY, d_globs.myDyy);
+    gettimeofday(&t_end, NULL);
+    timeval_subtract(&t_diff, &t_end, &t_start);
+    e_initOp += (t_diff.tv_sec*1e6+t_diff.tv_usec);
     /*
     bool succes = true;
     // Test code:
@@ -177,7 +194,11 @@ void   run_optimGPU(
     // end setPayoff
     */
     // GPU:
+    gettimeofday(&t_start, NULL);
     deviceSetPayoff<T2D>(outer, numX, numY, d_globs);
+    gettimeofday(&t_end, NULL);
+    timeval_subtract(&t_diff, &t_end, &t_start);
+    e_payoff += (t_diff.tv_sec*1e6+t_diff.tv_usec);
     /*
     REAL* myResult = (REAL*) malloc(sizeof(REAL)*numX*numY);
     cudaMemcpy(myResult,d_globs.myResult,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
@@ -237,7 +258,11 @@ void   run_optimGPU(
         }
         // end updateParams
         */
+        gettimeofday(&t_start, NULL);
         deviceUpdateParams<T3D>(outer, numX, numY, alpha, beta, nu, time, d_globs);
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        e_update += (t_diff.tv_sec*1e6+t_diff.tv_usec);
 
         /*
         REAL* myVarX = (REAL*) malloc(sizeof(REAL)*numX*numY);
@@ -267,7 +292,11 @@ void   run_optimGPU(
 
         // GPU version
         //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+        gettimeofday(&t_start, NULL);
         explicitX<T2D>(outer, numX, numY, dtInv, d_tu, d_globs);
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        e_eX += (t_diff.tv_sec*1e6+t_diff.tv_usec);
         /*
         REAL* h_v = (REAL*) malloc(sizeof(REAL)*outer*numY*numX);
         REAL* h_u = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
@@ -336,8 +365,12 @@ void   run_optimGPU(
         }
         */
         //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+        gettimeofday(&t_start, NULL);
         explicitY<T3D>(outer, numX, numY, dtInv, d_v, d_tu, d_globs);
         sgmMatTranspose<T2D>(outer, numX, numY, d_tu, d_u);
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        e_eY += (t_diff.tv_sec*1e6+t_diff.tv_usec);
 
         /*
         cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
@@ -377,10 +410,14 @@ void   run_optimGPU(
         */
         //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
 //        deviceImplicitX<T3D>(outer, numX, numY, dtInv, d_globs, d_a, d_b, d_c);
+        gettimeofday(&t_start, NULL);
         deviceImplicitX<T3D>(outer, numX, numY, dtInv, d_globs, d_ta, d_tb, d_tc);
         sgmMatTranspose<T2D>(outer, numX, numY, d_ta, d_a);
         sgmMatTranspose<T2D>(outer, numX, numY, d_tb, d_b);
         sgmMatTranspose<T2D>(outer, numX, numY, d_tc, d_c);
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        e_iX += (t_diff.tv_sec*1e6+t_diff.tv_usec);
         /*
         REAL* a1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         REAL* b1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
@@ -422,7 +459,11 @@ void   run_optimGPU(
             }
         }
         */
+        gettimeofday(&t_start, NULL);
         deviceTridag<T2D*T2D/2>(d_a,d_b,d_c,d_u,outer*numX*numY,numX,d_u,d_yy);
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        e_triX += (t_diff.tv_sec*1e6+t_diff.tv_usec);
         /*
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
@@ -459,9 +500,13 @@ void   run_optimGPU(
         cpCpu2Gpu(u,outer,numY,numX,d_u); // copy u to d_u
         cpCpu2Gpu(v,outer,numX,numY,d_v); // copy v to d_v
         */
+        gettimeofday(&t_start, NULL);
         sgmMatTranspose<T2D>(outer, numY, numX, d_u, d_tu);
         deviceImplicitY<T3D>(outer, numX, numY, dtInv, d_globs,
                 d_a, d_b, d_c, d_tu, d_v, d_y);
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        e_iY += (t_diff.tv_sec*1e6+t_diff.tv_usec);
 
         //REAL* y1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY); // [outer][numX][nymY]
         /*
@@ -512,7 +557,11 @@ void   run_optimGPU(
             }
         }
         */
+        gettimeofday(&t_start, NULL);
         deviceTridag<T2D*T2D/2>(d_a,d_b,d_c,d_y,outer*numX*numY,numY,d_globs.myResult,d_yy);
+        gettimeofday(&t_end, NULL);
+        timeval_subtract(&t_diff, &t_end, &t_start);
+        e_triY += (t_diff.tv_sec*1e6+t_diff.tv_usec);
 
         /*
         myResult = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
@@ -529,10 +578,15 @@ void   run_optimGPU(
         free(myResult);
         */
         if (t == 0) {
+            gettimeofday(&t_start, NULL);
             deviceResult<T2D*T2D>(outer,numX,numY,d_globs,res);
+            gettimeofday(&t_end, NULL);
+            timeval_subtract(&t_diff, &t_end, &t_start);
+            e_res += (t_diff.tv_sec*1e6+t_diff.tv_usec);
         }
         // End value function
     }
+    printf("initGrid:\t%lu\ninitOperator:\t%lu\nsetPayoff:\t%lu\nupdateParams:\t%lu\nexplicitX:\t%lu\nexplicitY:\t%lu\nimplicitX:\t%lu\ntridagX:\t%lu\nimplicitY:\t%lu\ntridagY:\t%lu\nres copy:\t%lu\n",e_initGrid, e_initOp, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res);
     free(timeline);
     cudaFree(d_a); cudaFree(d_b);
     cudaFree(d_c); cudaFree(d_y);
