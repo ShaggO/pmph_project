@@ -75,17 +75,19 @@ void   run_optimGPU(
     // and make default element of vector
     // Hoisted from "value"
     // CPU:
+    /*
     PrivGlobs    globs(numX, numY, numT);
-    DevicePrivGlobs d_globs(outer, numX, numY, numT);
     initGrid(s0, alpha, nu, t, numX, numY, numT, globs);
     initOperator(globs.myX,globs.myDxx);
     initOperator(globs.myY,globs.myDyy);
     vector<PrivGlobs> globArr (outer, globs);
+    */
     // GPU:
+    DevicePrivGlobs d_globs(outer, numX, numY, numT);
     deviceInitGrid<T2D>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs);
     deviceInitOperator<T2D>(outer, numX, d_globs.myX, d_globs.myDxx);
     deviceInitOperator<T2D>(outer, numY, d_globs.myY, d_globs.myDyy);
-
+    /*
     // Test code:
     REAL* line = (REAL*) malloc(sizeof(REAL)*numT);
     REAL* myX = (REAL*) malloc(sizeof(REAL)*numX);
@@ -148,14 +150,16 @@ void   run_optimGPU(
     } else {
         printf("Something something dark side!\n");
     }
+    */
 
-    unsigned numZ = max(numX,numY);
+    //unsigned numZ = max(numX,numY);
 
     /**
      * setPayoff function (and strike)
      */
     // Make 3D kernel for computing payoff for each outer loop
     // x: globs.myX, y: globs.myY, z: outer
+    /*
     #pragma omp parallel for default(shared) schedule(static) if(outer>8)
     for(unsigned i = 0; i < outer; ++ i) {
         for(unsigned j=0;j<globArr[i].myX.size();++j)
@@ -170,9 +174,10 @@ void   run_optimGPU(
         }
     }
     // end setPayoff
+    */
     // GPU:
     deviceSetPayoff<T3D>(outer, numX, numY, d_globs);
-
+    /*
     REAL* myResult = (REAL*) malloc(sizeof(REAL)*numX*numY);
     cudaMemcpy(myResult,d_globs.myResult,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
     for(unsigned j = 0;j<numX;++j) {
@@ -182,6 +187,7 @@ void   run_optimGPU(
             }
         }
     }
+    */
 
     // Arrays for rollback:
     REAL* d_a, *d_b, *d_c, *d_y, *d_yy; // [outer][max(numX,numY)]
@@ -193,6 +199,8 @@ void   run_optimGPU(
     cudaMalloc((void**) &d_yy, sizeof(REAL)*outer*numX*numY);
     cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
     cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
+    REAL * timeline = (REAL*) malloc(sizeof(REAL)*numT);
+    cudaMemcpy(timeline,d_globs.myTimeline,sizeof(REAL)*numT,cudaMemcpyDeviceToHost);
 
     // Value function inserted:
     for(int t = numT-2;t>=0;--t)
@@ -201,8 +209,9 @@ void   run_optimGPU(
         /**
          * updateParams function
          */
-        REAL time = globs.myTimeline[t];
-        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs);
+        REAL time = timeline[t];
+        /*
+        //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs);
         // Make 3D kernel for computing update of params for each outer loop
         // x: globs.myX, y: globs.myY, z: outer
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
@@ -221,8 +230,10 @@ void   run_optimGPU(
             }
         }
         // end updateParams
+        */
         deviceUpdateParams<T3D>(outer, numX, numY, alpha, beta, nu, time, d_globs);
 
+        /*
         REAL* myVarX = (REAL*) malloc(sizeof(REAL)*numX*numY);
         cudaMemcpy(myVarX,d_globs.myVarX,sizeof(REAL)*numX*numY,cudaMemcpyDeviceToHost);
         REAL* myVarY = (REAL*) malloc(sizeof(REAL)*numX*numY);
@@ -236,22 +247,27 @@ void   run_optimGPU(
             }
         }
         if (!succes) { break; }
+        */
         /**
          * Rollback function
          */
-        REAL dtInv = 1.0/(globs.myTimeline[t+1]-globs.myTimeline[t]);
+        REAL dtInv = 1.0/(timeline[t+1]-timeline[t]);
+        /*
         vector<vector<vector<REAL> > > u(outer,vector<vector<REAL> >(numY, vector<REAL>(numX)));   // [outer][numY][numX]
         vector<vector<vector<REAL> > > v(outer,vector<vector<REAL> >(numX, vector<REAL>(numY)));   // [outer][numX][numY]
         vector<vector<vector<REAL> > > a(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), b(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), c(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ))), y(outer,vector<vector<REAL> >(numZ, vector<REAL>(numZ)));     // [outer][max(numX,numY)]
         vector<vector<REAL> > yy(outer,vector<REAL>(numZ));  // temporary used in tridag  // [outer][max(numX,numY)]
+        */
 
         // GPU version
-        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+        //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
         explicitX<T3D>(outer, numX, numY, dtInv, d_u, d_globs);
+        /*
         REAL* h_v = (REAL*) malloc(sizeof(REAL)*outer*numY*numX);
         REAL* h_u = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
-
+        */
+        /*
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
@@ -274,6 +290,8 @@ void   run_optimGPU(
                 }
             }
         }
+        */
+        /*
         succes = true;
         for (unsigned i=0;i<outer;i++) {
             for(unsigned j=0;j<numX;j++) {
@@ -286,11 +304,8 @@ void   run_optimGPU(
             }
         }
         if (!succes) { break;  }
-
-        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
-        explicitY<T3D>(outer, numX, numY, dtInv, d_v, d_u, d_globs);
-        cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
+        */
+        /*
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
@@ -315,6 +330,12 @@ void   run_optimGPU(
                 }
             }
         }
+        */
+        //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+        explicitY<T3D>(outer, numX, numY, dtInv, d_v, d_u, d_globs);
+        /*
+        cudaMemcpy(h_v,d_v, sizeof(REAL)*outer*numY*numX,cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_u,d_u, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         succes = true;
         for (unsigned i=0;i<outer;i++) {
             for(unsigned j=0;j<numX;j++) {
@@ -331,7 +352,8 @@ void   run_optimGPU(
             }
         }
         if (!succes) { break;  }
-
+        */
+        /*
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
@@ -345,10 +367,10 @@ void   run_optimGPU(
                 }
             }
         }
-
-        cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
+        */
+        //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
         deviceImplicitX<T3D>(outer, numX, numY, dtInv, d_globs, d_a, d_b, d_c);
-
+        /*
         REAL* a1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         REAL* b1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         REAL* c1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
@@ -376,7 +398,8 @@ void   run_optimGPU(
             }
         }
         if (!succes) { break; }
-
+        */
+        /*
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++ i ) {
@@ -387,8 +410,9 @@ void   run_optimGPU(
                 tridag(a[i][k],b[i][k],c[i][k],u[i][k],numX,u[i][k],yy[i]);
             }
         }
+        */
         deviceTridag<T2D*T2D>(d_a,d_b,d_c,d_u,outer*numX*numY,numX,d_u,d_yy);
-
+        /*
         // 3D kernel
         #pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++i ) {
@@ -415,16 +439,20 @@ void   run_optimGPU(
                 }
             }
         }
+        */
+        /*
         cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs);
         cpCpu2Gpu(a,outer,numX,numY,d_a); // copy a to d_a
         cpCpu2Gpu(b,outer,numX,numY,d_b); // copy b to d_b
         cpCpu2Gpu(c,outer,numX,numY,d_c); // copy c to d_c
         cpCpu2Gpu(u,outer,numY,numX,d_u); // copy u to d_u
         cpCpu2Gpu(v,outer,numX,numY,d_v); // copy v to d_v
+        */
         deviceImplicitY<T3D>(outer, numX, numY, dtInv, d_globs,
                 d_a, d_b, d_c, d_u, d_v, d_y);
 
-        REAL* y1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY); // [outer][numX][nymY]
+        //REAL* y1 = (REAL*) malloc(sizeof(REAL)*outer*numX*numY); // [outer][numX][nymY]
+        /*
         cudaMemcpy(a1,d_a, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         cudaMemcpy(b1,d_b, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         cudaMemcpy(c1,d_c, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
@@ -452,7 +480,9 @@ void   run_optimGPU(
             }
         }
         free(a1); free(b1); free(c1); free(y1);
+        */
 
+        /*
         // 3D kernel
         //#pragma omp parallel for default(shared) schedule(static) if(outer>8)
         for( unsigned i = 0; i < outer; ++i ) {
@@ -469,8 +499,10 @@ void   run_optimGPU(
                 res[i] = globArr[i].myResult[globArr[i].myXindex][globArr[i].myYindex];
             }
         }
+        */
         deviceTridag<T2D*T2D>(d_a,d_b,d_c,d_y,outer*numX*numY,numY,d_globs.myResult,d_yy);
 
+        /*
         myResult = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
         cudaMemcpy(myResult, d_globs.myResult, sizeof(REAL)*outer*numX*numY,cudaMemcpyDeviceToHost);
         for (int i = 0; i < outer; i++) {
@@ -482,12 +514,14 @@ void   run_optimGPU(
                 }
             }
         }
+        free(myResult);
+        */
         if (t == 0) {
             deviceResult<T2D*T2D>(outer,numX,numY,d_globs,res);
         }
-        free(myResult);
         // End value function
     }
+    free(timeline);
     cudaFree(d_a); cudaFree(d_b);
     cudaFree(d_c); cudaFree(d_y);
     cudaFree(d_yy);
