@@ -23,23 +23,6 @@ __global__ void initGridKernel( const unsigned outer, const unsigned numX, const
 }
 
 template<const unsigned T>
-__global__ void setPayoffKernel(
-        const unsigned outer,
-        const unsigned numX,
-        const unsigned numY,
-        REAL* myX,
-        REAL* myResult
-        )
-{
-    int i = blockIdx.x*T + threadIdx.x; // outer
-    int j = blockIdx.y*T + threadIdx.y; // myX.size
-    int k = blockIdx.z*T + threadIdx.z; // myY.size
-    if (i < outer && j < numX && k < numY) {
-        myResult[i * numX*numY + j * numY + k] = max(myX[i * numX + j]-0.001*i, (REAL)0.0);
-    }
-}
-
-template<const unsigned T>
 __global__ void initOperatorKernel(const unsigned outer, const unsigned num, REAL* x, REAL* Dxx) {
     int i = blockIdx.x*T + threadIdx.x;
     int j = blockIdx.y*T + threadIdx.y;
@@ -58,6 +41,23 @@ __global__ void initOperatorKernel(const unsigned outer, const unsigned num, REA
             Dxx[offset+2] = 2.0/dxu/(dxl+dxu);
             Dxx[offset+3] = 0.0;
         }
+    }
+}
+
+template<const unsigned T>
+__global__ void setPayoffKernel(
+        const unsigned outer,
+        const unsigned numX,
+        const unsigned numY,
+        REAL* myX,
+        REAL* myResult
+        )
+{
+    int i = blockIdx.x*blockDim.x + threadIdx.x; // outer
+    int j = blockIdx.y*blockDim.y + threadIdx.y; // myX.size
+    int k = blockIdx.z*blockDim.z + threadIdx.z; // myY.size
+    if (i < outer && j < numX && k < numY) {
+        myResult[i * numX*numY + j * numY + k] = max(myX[i * numX + j]-0.001*i, (REAL)0.0);
     }
 }
 
@@ -94,30 +94,28 @@ __global__ void explicitXKernel(
         REAL* myDxx
         )
 {
-    int i = blockIdx.x*T + threadIdx.x; // outer
-    int j = blockIdx.y*T + threadIdx.y; // myX.size
-    int k = blockIdx.z*T + threadIdx.z; // myY.size
+    int j = blockIdx.x*blockDim.x + threadIdx.x; // outer
+    int k = blockIdx.y*blockDim.y + threadIdx.y; // myX.size
+    int i = blockIdx.z*blockDim.z + threadIdx.z; // myY.size
 
 
     if (i < outer && j < numX && k < numY) {
-        // u[outer][numY][numX]
-        int uindex = i*numY*numX + k*numX + j;
-        // myVarX [outer][numX][numY]
-        int myVarXindex = i*numX*numY + j * numY + k;
+        // u[outer][numX][numY]
+        int idx = i*numY*numX + j*numY + k;
         // myResult[outer][numX][numY]
-        u[uindex] = dtInv * myResult[myVarXindex];
+        u[idx] = dtInv * myResult[idx];
 
         // Dxx [outer][numX][4]
         int Dxxindex = i*numX*4 + j*4;
-        REAL varX = myVarX[myVarXindex];
+        REAL varX = myVarX[idx];
         if (j > 0) {
-            u[uindex] +=    0.5*(0.5*varX*myDxx[Dxxindex])
+            u[idx] +=    0.5*(0.5*varX*myDxx[Dxxindex])
                                 * myResult[i*numX*numY + (j-1)*numY + k];
         }
-        u[uindex] +=        0.5*(0.5*varX*myDxx[Dxxindex+1])
-                                * myResult[myVarXindex];
+        u[idx] +=        0.5*(0.5*varX*myDxx[Dxxindex+1])
+                                * myResult[idx];
         if (j < numX) {
-            u[uindex] +=    0.5*(0.5*varX*myDxx[Dxxindex+2])
+            u[idx] +=    0.5*(0.5*varX*myDxx[Dxxindex+2])
                                 * myResult[i*numX*numY + (j+1)*numY + k];
         }
     }
@@ -141,19 +139,19 @@ __global__ void explicitYKernel(
     int k = blockIdx.z*T + threadIdx.z; // myY.size
     if (i < outer && j < numX && k < numY) {
         // v[outer][numX][numY]
-        int vindex = i*numX*numY + j*numY + k;
-        v[vindex] = 0.0;
+        int idx = i*numX*numY + j*numY + k;
+        v[idx] = 0.0;
 
         int Dyyindex = i*numY*4 + k*4;
-        REAL varY = myVarY[vindex];
+        REAL varY = myVarY[idx];
         if(k > 0) {
-            v[vindex] +=    (0.5*varY*myDyy[Dyyindex])   * myResult[vindex-1];
+            v[idx] +=    (0.5*varY*myDyy[Dyyindex])   * myResult[idx-1];
         }
-        v[vindex]  +=       (0.5*varY*myDyy[Dyyindex+1]) * myResult[vindex];
+        v[idx]  +=       (0.5*varY*myDyy[Dyyindex+1]) * myResult[idx];
         if(k < numY-1) {
-            v[vindex] +=    (0.5*varY*myDyy[Dyyindex+2]) * myResult[vindex+1];
+            v[idx] +=    (0.5*varY*myDyy[Dyyindex+2]) * myResult[idx+1];
         }
-        u[i*numY*numX + k*numX + j] += v[vindex];
+        u[idx] += v[idx];
     }
 }
 
@@ -170,7 +168,7 @@ __global__ void implicitXKernel(const unsigned outer, const unsigned numX, const
     int k = blockIdx.y*T + threadIdx.y;
     int j = blockIdx.z*T + threadIdx.z;
     if (i < outer && j < numX && k < numY) {
-        int idx = i*(numX*numY)+k*numX+j;
+        int idx = i*(numX*numY)+j*numY+k;
         int idxDxx = i*(numX*4)+j*4;
         REAL varX = myVarX[i*(numX*numY)+j*numY+k];
         a[idx] =       - 0.5*(0.5*varX*myDxx[idxDxx]);
@@ -213,14 +211,14 @@ __global__ void implicitYKernelY(const unsigned outer, const unsigned numX, cons
     int k = blockIdx.z*T + threadIdx.z;
     if (i < outer && j < numX && k < numY) {
         int idx = i*numX*numY+j*numY+k;
-        y[idx] = dtInv*u[i*numX*numY+k*numX+j] - 0.5*v[idx];
+        y[idx] = dtInv*u[idx] - 0.5*v[idx];
     }
 }
 
 template<const unsigned T>
-__global__ void sgmMatTransposeKernel( REAL* A, REAL* trA, int rowsA, int colsA ) {
+__global__ void sgmMatTransposeKernel(int rowsA, int colsA, REAL* A, REAL* trA) {
     __shared__ REAL tile[T][T+1];
-    int gidz = blockIdx.z*blockDim.z*threadIdx.z;
+    int gidz = blockIdx.z*blockDim.z+threadIdx.z;
     A += gidz*rowsA*colsA;
     trA += gidz*rowsA*colsA;
     // follows code for matrix transp in x & y

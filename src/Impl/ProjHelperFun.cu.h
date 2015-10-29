@@ -210,10 +210,10 @@ void deviceSetPayoff(
         DevicePrivGlobs &globs
         )
 {
-    const unsigned dimx = ceil((float) outer / T);
+    const unsigned dimx = outer; //ceil((float) outer / T);
     const unsigned dimy = ceil((float) numX / T);
     const unsigned dimz = ceil((float) numY / T);
-    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    const dim3 block(1,T,T), grid(dimx,dimy,dimz);
 
     setPayoffKernel<T><<<grid, block>>>(outer, numX, numY, globs.myX, globs.myResult);
     cudaThreadSynchronize();
@@ -246,10 +246,10 @@ void explicitX(
         DevicePrivGlobs &globs
         )
 {
-    const unsigned dimx = ceil((float) outer / T);
+    const unsigned dimx = outer; //ceil((float) outer / T);
     const unsigned dimy = ceil((float) numX / T);
     const unsigned dimz = ceil((float) numY / T);
-    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    const dim3 block(T,T,1), grid(dimy,dimz,dimx);
 
     explicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, u, globs.myVarX, globs.myResult, globs.myDxx);
     cudaThreadSynchronize();
@@ -313,12 +313,12 @@ void deviceImplicitY(const unsigned outer, const unsigned numX, const unsigned n
 }
 
 template<const unsigned T>
-void sgmMatTranspose(REAL* A, REAL* trA, int outer, int rowsA, int colsA) {
+void sgmMatTranspose(int outer, int rowsA, int colsA, REAL* A, REAL* trA) {
     const unsigned dimx = ceil(((float) colsA) / T);
     const unsigned dimy = ceil(((float) rowsA) / T);
-    const unsigned dimz = ceil(((float) outer) / T);
-    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
-    sgmMatTransposeKernel<T><<<grid, block>>>(A, trA, rowsA, colsA);
+    const unsigned dimz = outer;
+    const dim3 block(T,T,1), grid(dimx,dimy,dimz);
+    sgmMatTransposeKernel<T><<<grid, block>>>(rowsA, colsA, A, trA);
     cudaThreadSynchronize();
 }
 __global__ void
