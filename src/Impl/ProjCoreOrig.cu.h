@@ -72,12 +72,13 @@ void   run_optimGPU(
                       REAL*           res   // [outer] RESULT
 ) {
 
-    unsigned long int e_initGrid, e_initOp, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res, e_cudaMalloc;
+    unsigned long int e_all, e_initGrid, e_initOp, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX,
+        e_iY, e_triY, e_res, e_cudaMalloc, e_free;
     e_initGrid = 0; e_initOp = 0; e_payoff = 0; e_update = 0;
     e_eX = 0; e_eY = 0; e_iX = 0; e_triX = 0; e_iY = 0;
     e_triY = 0; e_res = 0; e_cudaMalloc = 0;
-    struct timeval t_start, t_end, t_diff;
-    gettimeofday(&t_start, NULL);
+    struct timeval t_start, t_end, t_diff, t_start_all, t_end_all;
+    gettimeofday(&t_start_all, NULL);
     // Generate vector of globs. Initialize grid and operators onces
     // make default element of vector
     // Hoisted from "value"
@@ -90,9 +91,9 @@ void   run_optimGPU(
     vector<PrivGlobs> globArr (outer, globs);
     */
     // GPU:
+    gettimeofday(&t_start, NULL);
     DevicePrivGlobs d_globs(outer, numX, numY, numT);
 
-    gettimeofday(&t_start, NULL);
     deviceInitGrid<T2D>(s0, alpha, nu, t, outer, numX, numY, numT, d_globs);
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
@@ -216,17 +217,18 @@ void   run_optimGPU(
     REAL* d_a, *d_b, *d_c, *d_y, *d_yy; // [outer][max(numX,numY)]
     REAL *d_v, *d_u, *d_tu;
     REAL *d_ta, *d_tb, *d_tc;
-    cudaMalloc((void**) &d_a, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_b, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_c, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_ta, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_tb, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_tc, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_y, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_yy, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_tu, sizeof(REAL)*outer*numX*numY);
-    cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
+    int mem_full_size = sizeof(REAL)*outer*numX*numY;
+    cudaMalloc((void**) &d_a,  mem_full_size);
+    cudaMalloc((void**) &d_b,  mem_full_size);
+    cudaMalloc((void**) &d_c,  mem_full_size);
+    cudaMalloc((void**) &d_ta, mem_full_size);
+    cudaMalloc((void**) &d_tb, mem_full_size);
+    cudaMalloc((void**) &d_tc, mem_full_size);
+    cudaMalloc((void**) &d_y,  mem_full_size);
+    cudaMalloc((void**) &d_yy, mem_full_size);
+    cudaMalloc((void**) &d_u,  mem_full_size);
+    cudaMalloc((void**) &d_tu, mem_full_size);
+    cudaMalloc((void**) &d_v,  mem_full_size);
     deviceSetPayoff<T2D>(outer, numX, numY, d_globs);
     gettimeofday(&t_end, NULL);
     timeval_subtract(&t_diff, &t_end, &t_start);
@@ -566,7 +568,7 @@ void   run_optimGPU(
         deviceTridag<T2D*T2D/2>(d_a,d_b,d_c,d_y,outer*numX*numY,numY,d_globs.myResult,d_yy);
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
-        e_triY += (t_diff.tv_sec*1e6+t_diff.tv_usec);
+        e_triY = e_triY + (t_diff.tv_sec*1e6+t_diff.tv_usec);
 
         /*
         myResult = (REAL*) malloc(sizeof(REAL)*outer*numX*numY);
@@ -591,14 +593,25 @@ void   run_optimGPU(
         }
         // End value function
     }
-    printf("initGrid:\t%lu\ninitOperator:\t%lu\ncudaMalloc:\t%lu\nsetPayoff:\t%lu\nupdateParams:\t%lu\nexplicitX:\t%lu\nexplicitY:\t%lu\nimplicitX:\t%lu\ntridagX:\t%lu\nimplicitY:\t%lu\ntridagY:\t%lu\nres copy:\t%lu\n",
-            e_initGrid, e_initOp, e_cudaMalloc, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res);
+    gettimeofday(&t_start, NULL);
     free(timeline);
     cudaFree(d_a); cudaFree(d_b);
     cudaFree(d_c); cudaFree(d_y);
     cudaFree(d_yy);
     cudaFree(d_ta); cudaFree(d_tb); cudaFree(d_tc);
     cudaFree(d_u); cudaFree(d_tu); cudaFree(d_v);
+    gettimeofday(&t_end, NULL);
+    timeval_subtract(&t_diff, &t_end, &t_start);
+    e_free = (t_diff.tv_sec*1e6+t_diff.tv_usec);
+
+    gettimeofday(&t_end_all, NULL);
+    timeval_subtract(&t_diff, &t_end_all, &t_start_all);
+    e_all = (t_diff.tv_sec*1e6+t_diff.tv_usec);
+    printf("initGrid:\t%lu\ninitOperator:\t%lu\ncudaMalloc:\t%lu\nsetPayoff:\t%lu\n\
+updateParams:\t%lu\nexplicitX:\t%lu\nexplicitY:\t%lu\nimplicitX:\t%lu\n\
+tridagX:\t%lu\nimplicitY:\t%lu\ntridagY:\t%lu\nres copy:\t%lu\nclean-up:\t%lu\nAll code:\t%lu\n",
+            e_initGrid, e_initOp, e_cudaMalloc, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX,
+            e_iY, e_triY, e_res, e_free, e_all);
 }
 
 #endif // PROJ_CORE_ORIG

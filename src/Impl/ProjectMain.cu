@@ -18,6 +18,7 @@ int main()
     const unsigned T3D = 8;
     REAL* res = (REAL*)malloc(OUTER_LOOP_COUNT*sizeof(REAL));
 
+    cudaFree(0);
     {   // Original Program (Sequential CPU Execution)
         cout<<"\n// Running Optimized, Parallel Project Program"<<endl;
 

@@ -6,6 +6,7 @@
 #include <assert.h>
 
 int get_CPU_num_threads() {
+#pragma diag_suppress boolean_controlling_expr_is_constant
     int procs;
 
 #pragma omp parallel shared(procs)
