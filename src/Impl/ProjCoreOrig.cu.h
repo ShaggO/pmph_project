@@ -72,10 +72,10 @@ void   run_optimGPU(
                       REAL*           res   // [outer] RESULT
 ) {
 
-    unsigned long int e_initGrid, e_initOp, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res;
+    unsigned long int e_initGrid, e_initOp, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res, e_cudaMalloc;
     e_initGrid = 0; e_initOp = 0; e_payoff = 0; e_update = 0;
     e_eX = 0; e_eY = 0; e_iX = 0; e_triX = 0; e_iY = 0;
-    e_triY = 0; e_res = 0;
+    e_triY = 0; e_res = 0; e_cudaMalloc = 0;
     struct timeval t_start, t_end, t_diff;
     gettimeofday(&t_start, NULL);
     // Generate vector of globs. Initialize grid and operators onces
@@ -212,6 +212,7 @@ void   run_optimGPU(
     */
 
     // Arrays for rollback:
+    gettimeofday(&t_start, NULL);
     REAL* d_a, *d_b, *d_c, *d_y, *d_yy; // [outer][max(numX,numY)]
     REAL *d_v, *d_u, *d_tu;
     REAL *d_ta, *d_tb, *d_tc;
@@ -226,6 +227,10 @@ void   run_optimGPU(
     cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
     cudaMalloc((void**) &d_tu, sizeof(REAL)*outer*numX*numY);
     cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
+    deviceSetPayoff<T2D>(outer, numX, numY, d_globs);
+    gettimeofday(&t_end, NULL);
+    timeval_subtract(&t_diff, &t_end, &t_start);
+    e_cudaMalloc += (t_diff.tv_sec*1e6+t_diff.tv_usec);
     REAL * timeline = (REAL*) malloc(sizeof(REAL)*numT);
     cudaMemcpy(timeline,d_globs.myTimeline,sizeof(REAL)*numT,cudaMemcpyDeviceToHost);
 
@@ -586,13 +591,14 @@ void   run_optimGPU(
         }
         // End value function
     }
-    printf("initGrid:\t%lu\ninitOperator:\t%lu\nsetPayoff:\t%lu\nupdateParams:\t%lu\nexplicitX:\t%lu\nexplicitY:\t%lu\nimplicitX:\t%lu\ntridagX:\t%lu\nimplicitY:\t%lu\ntridagY:\t%lu\nres copy:\t%lu\n",e_initGrid, e_initOp, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res);
+    printf("initGrid:\t%lu\ninitOperator:\t%lu\ncudaMalloc:\t%lu\nsetPayoff:\t%lu\nupdateParams:\t%lu\nexplicitX:\t%lu\nexplicitY:\t%lu\nimplicitX:\t%lu\ntridagX:\t%lu\nimplicitY:\t%lu\ntridagY:\t%lu\nres copy:\t%lu\n",
+            e_initGrid, e_initOp, e_cudaMalloc, e_payoff, e_update, e_eX, e_eY, e_iX, e_triX, e_iY, e_triY, e_res);
     free(timeline);
     cudaFree(d_a); cudaFree(d_b);
     cudaFree(d_c); cudaFree(d_y);
     cudaFree(d_yy);
     cudaFree(d_ta); cudaFree(d_tb); cudaFree(d_tc);
-    cudaFree(d_u); cudaFree(d_v);
+    cudaFree(d_u); cudaFree(d_tu); cudaFree(d_v);
 }
 
 #endif // PROJ_CORE_ORIG
