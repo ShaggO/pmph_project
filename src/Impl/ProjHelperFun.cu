@@ -197,7 +197,7 @@ TRIDAG_SOLVER(  REAL* a,
     //--------------------------------------------------
     // 1.a) first map
     const unsigned int beg_seg_ind = (gid / sgm_sz) * sgm_sz;
-    const unsigned int begseg = (tid / sgm_sz) * sgm_sz;
+    const unsigned int beg_seg_ind_sh = (tid / sgm_sz) * sgm_sz;
     REAL b0 = (gid < n) ? b[beg_seg_ind] : 1.0;
     mat_sh[tid] = (gid!=beg_seg_ind && gid < n) ?
                     MyReal4(b[gid], agid*c[gid-1], 1.0, 0.0) :
@@ -246,9 +246,9 @@ TRIDAG_SOLVER(  REAL* a,
     // 3.a) first map
     const unsigned int end_seg_ind = (beg_seg_ind + sgm_sz) - 1;
     const unsigned int k = (end_seg_ind - gid) + beg_seg_ind ;
-    const unsigned int endseg = begseg + sgm_sz - 1;
-    const unsigned int ksh = endseg - tid + begseg;
-    REAL yn = u_sh[endseg] / uu_sh[endseg];
+    const unsigned int end_seg_ind_sh = beg_seg_ind_sh + sgm_sz - 1;
+    const unsigned int ksh = end_seg_ind_sh - tid + beg_seg_ind_sh;
+    REAL yn = u_sh[end_seg_ind_sh] / uu_sh[end_seg_ind_sh];
     lin_sh[tid] = (gid!=beg_seg_ind && gid < n) ?
                     MyReal2( u_sh[ksh]/uu_sh[ksh], -c[k]/uu_sh[ksh] ) :
                     MyReal2( 0.0,        1.0         ) ;
