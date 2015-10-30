@@ -241,12 +241,12 @@ Some of the kernels are computed transposed, and some use transposed inputs as c
 8. implicitY(trU)
 9. tridag
 \end{lstlisting}
-\caption{\label{fig:trcode} The transposed variables and functions, wehre \texttt{trX} means "the transpose of X."}
+\caption{\label{fig:trcode} The transposed variables and functions, where \texttt{trX} means "the transpose of X."}
 \end{figure}
 \subsubsection{Correctness}
 Several variables are moved to shared memory, some of the kernels are computed transposed, and some use transposed inputs as compared to the original: \texttt{explicitX} calculates \texttt{u} transposed; \texttt{explicitY} accumulates values into \texttt{u} transposed; \texttt{implicitX} calculates transposed \texttt{a}, \texttt{b}, and \texttt{c}, followed by transposing the results (so that we receive standard \texttt{a}, \texttt{b}, and \texttt{c}); \texttt{implicitY} uses the transposed \texttt{u} (\texttt{u} is modified by the first \texttt{tridag} call before \texttt{implicitY} is calculated), so \texttt{u} is transposed just before \texttt{implicitY} is called.
 
-We are assured of the correctness of these modifications. We know that the variables we moved to shared memory were not going to cause race conditions, since they are accessed as read variables, and locked until the next iteration. The transposed/regular variables do not matter as long as the calculations work the same.
+We are assured of the correctness of these modifications. We know that the variables we moved to shared memory were not going to cause race conditions, since they are accessed as read variables. The transposed/regular variables do not matter as long as the calculations work the same, and for some of the operations it is easier to perform them with a transposed version of the matrices.
 
 Finally, the GPU program was constantly validated against the CPU implementation.
 \section{Results}
@@ -254,7 +254,7 @@ Finally, the GPU program was constantly validated against the CPU implementation
 \begin{figure}[h]
 \caption{\label{fig:results} Results of the three different implementations.}
 \end{figure}
-\subsubsection{Conclusion}
+\subsection{Conclusion}
 \bibliographystyle{plain}
 \bibliography{bibliography}
 \end{document}          
