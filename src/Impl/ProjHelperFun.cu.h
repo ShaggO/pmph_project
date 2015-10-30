@@ -329,8 +329,7 @@ TRIDAG_SOLVER(  REAL* a,
                 REAL* r,
                 const unsigned int n,
                 const unsigned int sgm_sz,
-                REAL* u,
-                REAL* uu
+                REAL* u
 );
 template<const unsigned block_size>
 void deviceTridag( REAL*   a,
@@ -339,8 +338,7 @@ void deviceTridag( REAL*   a,
                         REAL*   r,
                         const unsigned int n,
                         const unsigned int sgm_sz,
-                        REAL*   u,
-                        REAL*   uu
+                        REAL*   u
 ) {
     unsigned int num_blocks;
     unsigned int sh_mem_size = block_size * 32;
@@ -355,7 +353,7 @@ void deviceTridag( REAL*   a,
         exit(0);
     }
     num_blocks = (n + (block_size - 1)) / block_size;
-    TRIDAG_SOLVER<<< num_blocks, block_size, sh_mem_size >>>(a, b, c, r, n, sgm_sz, u, uu);
+    TRIDAG_SOLVER<<< num_blocks, block_size, sh_mem_size >>>(a, b, c, r, n, sgm_sz, u);
     cudaThreadSynchronize();
 }
 

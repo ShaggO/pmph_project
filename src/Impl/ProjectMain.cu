@@ -14,7 +14,7 @@ int main()
     readDataSet( OUTER_LOOP_COUNT, NUM_X, NUM_Y, NUM_T );
 
     const int Ps = get_CPU_num_threads();
-    const unsigned T2D = 32;
+    const unsigned T2D = 16;
     const unsigned T3D = 8;
     REAL* res = (REAL*)malloc(OUTER_LOOP_COUNT*sizeof(REAL));
 

@@ -104,21 +104,23 @@ __global__ void explicitXKernel(
         int idxO = i*numX*numY;
         int idx = idxO + j*numY + k;
         // myResult[outer][numX][numY]
-        u[idx] = dtInv * myResult[idx];
+        REAL uval;
+        uval = dtInv * myResult[idx];
 
         // Dxx [outer][numX][4]
         int Dxxindex = i*numX*4 + j*4;
         REAL varX = 0.25*myVarX[idx];
         if (j > 0) {
-            u[idx] +=    (varX*myDxx[Dxxindex])
+            uval +=    (varX*myDxx[Dxxindex])
                                 * myResult[idxO + (j-1)*numY + k];
         }
-        u[idx] +=        (varX*myDxx[Dxxindex+1])
+        uval +=        (varX*myDxx[Dxxindex+1])
                                 * myResult[idx];
         if (j < numX) {
-            u[idx] +=    (varX*myDxx[Dxxindex+2])
+            uval +=    (varX*myDxx[Dxxindex+2])
                                 * myResult[idxO + (j+1)*numY + k];
         }
+        u[idx] = uval;
     }
 }
 
@@ -141,18 +143,19 @@ __global__ void explicitYKernel(
     if (i < outer && j < numX && k < numY) {
         // v[outer][numX][numY]
         int idx = i*numX*numY + j*numY + k;
-        v[idx] = 0.0;
+        REAL val = 0.0;
 
         int Dyyindex = i*numY*4 + k*4;
         REAL varY = 0.5*myVarY[idx];
         if(k > 0) {
-            v[idx] +=    (varY*myDyy[Dyyindex])   * myResult[idx-1];
+            val +=    (varY*myDyy[Dyyindex])   * myResult[idx-1];
         }
-        v[idx]  +=       (varY*myDyy[Dyyindex+1]) * myResult[idx];
+        val  +=       (varY*myDyy[Dyyindex+1]) * myResult[idx];
         if(k < numY-1) {
-            v[idx] +=    (varY*myDyy[Dyyindex+2]) * myResult[idx+1];
+            val +=    (varY*myDyy[Dyyindex+2]) * myResult[idx+1];
         }
-        u[idx] += v[idx];
+        v[idx] = val;
+        u[idx] += val;
     }
 }
 

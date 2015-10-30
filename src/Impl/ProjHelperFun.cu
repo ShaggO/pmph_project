@@ -169,8 +169,7 @@ TRIDAG_SOLVER(  REAL* a,
                 REAL* r,
                 const unsigned int n,
                 const unsigned int sgm_sz,
-                REAL* u,
-                REAL* uu
+                REAL* u
 ) {
     const unsigned int tid = threadIdx.x;
     const unsigned int gid = blockIdx.x*blockDim.x + tid;

@@ -89,7 +89,7 @@ void   run_optimGPU(
 
     // Arrays for rollback:
     gettimeofday(&t_start, NULL);
-    REAL* d_a, *d_b, *d_c, *d_y, *d_yy; // [outer][max(numX,numY)]
+    REAL* d_a, *d_b, *d_c, *d_y; // [outer][max(numX,numY)]
     REAL *d_v, *d_u, *d_tu;
     REAL *d_ta, *d_tb, *d_tc;
     int mem_full_size = sizeof(REAL)*outer*numX*numY;
@@ -100,7 +100,6 @@ void   run_optimGPU(
     cudaMalloc((void**) &d_tb, mem_full_size);
     cudaMalloc((void**) &d_tc, mem_full_size);
     cudaMalloc((void**) &d_y,  mem_full_size);
-    cudaMalloc((void**) &d_yy, mem_full_size);
     cudaMalloc((void**) &d_u,  mem_full_size);
     cudaMalloc((void**) &d_tu, mem_full_size);
     cudaMalloc((void**) &d_v,  mem_full_size);
@@ -156,7 +155,7 @@ void   run_optimGPU(
 
         gettimeofday(&t_start, NULL);
         // tridag X
-        deviceTridag<T2D*T2D/2>(d_a,d_b,d_c,d_u,outer*numX*numY,numX,d_u,d_yy);
+        deviceTridag<T2D*T2D>(d_a,d_b,d_c,d_u,outer*numX*numY,numX,d_u);
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
         e_triX += (t_diff.tv_sec*1e6+t_diff.tv_usec);
@@ -172,7 +171,7 @@ void   run_optimGPU(
 
         gettimeofday(&t_start, NULL);
         // tridag Y
-        deviceTridag<T2D*T2D/2>(d_a,d_b,d_c,d_y,outer*numX*numY,numY,d_globs.myResult,d_yy);
+        deviceTridag<T2D*T2D>(d_a,d_b,d_c,d_y,outer*numX*numY,numY,d_globs.myResult);
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
         e_triY = e_triY + (t_diff.tv_sec*1e6+t_diff.tv_usec);
@@ -190,7 +189,6 @@ void   run_optimGPU(
     free(timeline);
     cudaFree(d_a); cudaFree(d_b);
     cudaFree(d_c); cudaFree(d_y);
-    cudaFree(d_yy);
     cudaFree(d_ta); cudaFree(d_tb); cudaFree(d_tc);
     cudaFree(d_u); cudaFree(d_tu); cudaFree(d_v);
     gettimeofday(&t_end, NULL);
