@@ -111,12 +111,54 @@ The reason we are allowed to do this is because we are not fundamentally changin
 After this work, the program is in a state to distribute the various loops. There is a mild amount of slowdown, since we allocate more memory to some of the variables, and we perform some initial calculations which otherwise performed per loop iteration. This is not a good stopping point, but it is necessary to continue.
 \subsection{Kernel Replacement}
 \subsubsection{The Idea}
-After loop distribution, we began to convert the loops to CUDA kernels. These kernels are copied almost directly from the already existing CPU code. This allowed us to begin using the GPU to run tridag.
+After loop distribution, we began to convert the loops to CUDA kernels. These kernels are copied almost directly from the already existing CPU code. This allowed us to begin using the GPU, and CUDA.
 \subsubsection{The Work}
-For each of the distributed loops, we designed a kernel around it. For example, 
-[Write one of the snippets we have converted!]
+For each of the distributed loops, we na\"ivly translated the code into a CUDA kernel. That is, we attempted to rewrite the functions so that they performed precisely the same task on the GPU as they did on the CPU. Figures \ref{fig:nokernel} and \ref{fig:yeskernel}, show the conversion of the function \texttt{void setPayoff} from ProjCoreOrig.cpp into the \texttt{\_\_global\_\_ void setPayoffKernel} in the file ProjKernels.cu.h.
+
+All distributed loops and matching functions were converted. The majority of the work was 
+ \begin{figure}[h]
+	\begin{lstlisting}
+void setPayoff(const REAL strike, PrivGlobs& globs )
+{
+	for(unsigned i=0;i<globs.myX.size();++i)
+	{
+		REAL payoff = max(globs.myX[i]-strike, (REAL)0.0);
+		for(unsigned j=0;j<globs.myY.size();++j)
+			globs.myResult[i][j] = payoff;
+	}
+}
+	\end{lstlisting}
+	\caption{ \label{fig:nokernel} The original implementation of \texttt{void setPayoff}.}
+\end{figure}
+\begin{figure}[h]
+	\begin{lstlisting}
+template<const unsigned T>
+__global__ void setPayoffKernel(
+	const unsigned outer,
+	const unsigned numX,
+	const unsigned numY,
+	REAL* myX,
+	REAL* myResult
+	)
+{
+	int i = blockIdx.x*T + threadIdx.x; // outer
+	int j = blockIdx.y*T + threadIdx.y; // myX.size
+	int k = blockIdx.z*T + threadIdx.z; // myY.size
+	if (i < outer && j < numX && k < numY) {
+		myResult[i * numX*numY + j * numY + k] = max(myX[i * numX + j]-0.001*i, (REAL)0.0);
+	}
+}
+	\end{lstlisting}
+	\caption{ \label{fig:yeskernel} The equivalent CUDA kernel.}
+\end{figure}
+
 \subsubsection{Correctness}
-Well, it's just direct translation
+It is no longer as easy to argue that this is a simple replacement. Transforming the distributed loops into Well, it's just direct translation
+
+the problem was, that the first CUDA call of the program also loads the entire CUDA runtime library, which gives a major overhead compared to the actual running time on our datasets.
+
+so the timings we saw earlier were highly dominated by the cuda library loadtime
+we've added a "cudaFree(0);" line in the ProjectMain before we start timing the execution
 \subsection{TRIDAG}
 \subsubsection{The Idea}
 \subsubsection{The Work}
