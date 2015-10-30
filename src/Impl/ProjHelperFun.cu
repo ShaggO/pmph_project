@@ -180,30 +180,36 @@ TRIDAG_SOLVER(  REAL* a,
     // shared memory space for the 2x2 matrix multiplication SCAN
     volatile MyReal4* mat_sh = (volatile MyReal4*)sh_mem;
     // shared memory space for the linear-function composition SCAN
-    volatile MyReal2* lin_sh = (volatile MyReal2*) (mat_sh + blockDim.x);
+    // reuses mat_sh memory as it is calculated after mat_sh
+    volatile MyReal2* lin_sh = (volatile MyReal2*) (mat_sh);
     // shared memory space for the flag array
-    volatile int*     flg_sh = (volatile int*    ) (lin_sh + blockDim.x);
+    volatile int*     flg_sh = (volatile int*    ) (mat_sh + blockDim.x);
+    volatile REAL*    uu_sh  = (volatile REAL*   ) (flg_sh + blockDim.x);
+    volatile REAL*     u_sh  = (volatile REAL*   ) (uu_sh  + blockDim.x);
 
     // make the flag array
     flg_sh[tid] = (tid % sgm_sz == 0) ? 1 : 0;
     __syncthreads();
 
+    REAL agid = -a[gid];
     //--------------------------------------------------
     // Recurrence 1: b[i] = b[i] - a[i]*c[i-1]/b[i-1] --
     //   solved by scan with 2x2 matrix mult operator --
     //--------------------------------------------------
     // 1.a) first map
     const unsigned int beg_seg_ind = (gid / sgm_sz) * sgm_sz;
+    const unsigned int begseg = (tid / sgm_sz) * sgm_sz;
     REAL b0 = (gid < n) ? b[beg_seg_ind] : 1.0;
     mat_sh[tid] = (gid!=beg_seg_ind && gid < n) ?
-                    MyReal4(b[gid], -a[gid]*c[gid-1], 1.0, 0.0) :
+                    MyReal4(b[gid], agid*c[gid-1], 1.0, 0.0) :
                     MyReal4(1.0,                 0.0, 0.0, 1.0) ;
     // 1.b) inplaceScanInc<MatMult2b2>(n,mats);
     __syncthreads();
     MyReal4 res4 = sgmScanIncBlock <MatMult2b2, MyReal4, int>(mat_sh, flg_sh, tid);
     // 1.c) second map
     if(gid < n) {
-        uu[gid] = (res4.x*b0 + res4.y) / (res4.z*b0 + res4.w) ;
+        uu_sh[tid] = (res4.x*b0 + res4.y) / (res4.z*b0 + res4.w) ;
+        //uu[gid] = (res4.x*b0 + res4.y) / (res4.z*b0 + res4.w) ;
     }
     __syncthreads();
 
@@ -218,14 +224,15 @@ TRIDAG_SOLVER(  REAL* a,
     // 2.a) first map
     REAL y0 = (gid < n) ? r[beg_seg_ind] : 1.0;
     lin_sh[tid] = (gid!=beg_seg_ind && gid < n) ?
-                    MyReal2(r[gid], -a[gid]/uu[gid-1]) :
+                    MyReal2(r[gid], agid/uu_sh[tid-1]) :
                     MyReal2(0.0,    1.0              ) ;
     // 2.b) inplaceScanInc<LinFunComp>(n,lfuns);
     __syncthreads();
     MyReal2 res2 = sgmScanIncBlock <LinFunComp, MyReal2, int>(lin_sh, flg_sh, tid);
     // 2.c) second map
     if(gid < n) {
-        u[gid] = res2.x + y0*res2.y;
+        u_sh[tid] = res2.x + y0*res2.y;
+        //u[gid] =  res2.x + y0*res2.y;
     }
     __syncthreads();
 
@@ -240,9 +247,11 @@ TRIDAG_SOLVER(  REAL* a,
     // 3.a) first map
     const unsigned int end_seg_ind = (beg_seg_ind + sgm_sz) - 1;
     const unsigned int k = (end_seg_ind - gid) + beg_seg_ind ;
-    REAL yn = u[end_seg_ind] / uu[end_seg_ind];
+    const unsigned int endseg = begseg + sgm_sz - 1;
+    const unsigned int ksh = endseg - tid + begseg;
+    REAL yn = u_sh[endseg] / uu_sh[endseg];
     lin_sh[tid] = (gid!=beg_seg_ind && gid < n) ?
-                    MyReal2( u[k]/uu[k], -c[k]/uu[k] ) :
+                    MyReal2( u_sh[ksh]/uu_sh[ksh], -c[k]/uu_sh[ksh] ) :
                     MyReal2( 0.0,        1.0         ) ;
     // 3.b) inplaceScanInc<LinFunComp>(n,lfuns);
     __syncthreads();
