@@ -101,22 +101,23 @@ __global__ void explicitXKernel(
 
     if (i < outer && j < numX && k < numY) {
         // u[outer][numX][numY]
-        int idx = i*numY*numX + j*numY + k;
+        int idxO = i*numX*numY;
+        int idx = idxO + j*numY + k;
         // myResult[outer][numX][numY]
         u[idx] = dtInv * myResult[idx];
 
         // Dxx [outer][numX][4]
         int Dxxindex = i*numX*4 + j*4;
-        REAL varX = myVarX[idx];
+        REAL varX = 0.25*myVarX[idx];
         if (j > 0) {
-            u[idx] +=    0.5*(0.5*varX*myDxx[Dxxindex])
-                                * myResult[i*numX*numY + (j-1)*numY + k];
+            u[idx] +=    (varX*myDxx[Dxxindex])
+                                * myResult[idxO + (j-1)*numY + k];
         }
-        u[idx] +=        0.5*(0.5*varX*myDxx[Dxxindex+1])
+        u[idx] +=        (varX*myDxx[Dxxindex+1])
                                 * myResult[idx];
         if (j < numX) {
-            u[idx] +=    0.5*(0.5*varX*myDxx[Dxxindex+2])
-                                * myResult[i*numX*numY + (j+1)*numY + k];
+            u[idx] +=    (varX*myDxx[Dxxindex+2])
+                                * myResult[idxO + (j+1)*numY + k];
         }
     }
 }
@@ -143,13 +144,13 @@ __global__ void explicitYKernel(
         v[idx] = 0.0;
 
         int Dyyindex = i*numY*4 + k*4;
-        REAL varY = myVarY[idx];
+        REAL varY = 0.5*myVarY[idx];
         if(k > 0) {
-            v[idx] +=    (0.5*varY*myDyy[Dyyindex])   * myResult[idx-1];
+            v[idx] +=    (varY*myDyy[Dyyindex])   * myResult[idx-1];
         }
-        v[idx]  +=       (0.5*varY*myDyy[Dyyindex+1]) * myResult[idx];
+        v[idx]  +=       (varY*myDyy[Dyyindex+1]) * myResult[idx];
         if(k < numY-1) {
-            v[idx] +=    (0.5*varY*myDyy[Dyyindex+2]) * myResult[idx+1];
+            v[idx] +=    (varY*myDyy[Dyyindex+2]) * myResult[idx+1];
         }
         u[idx] += v[idx];
     }
@@ -170,10 +171,10 @@ __global__ void implicitXKernel(const unsigned outer, const unsigned numX, const
     if (i < outer && j < numX && k < numY) {
         int idx = i*(numX*numY)+j*numY+k;
         int idxDxx = i*(numX*4)+j*4;
-        REAL varX = myVarX[i*(numX*numY)+j*numY+k];
-        a[idx] =       - 0.5*(0.5*varX*myDxx[idxDxx]);
-        b[idx] = dtInv - 0.5*(0.5*varX*myDxx[idxDxx+1]);
-        c[idx] =       - 0.5*(0.5*varX*myDxx[idxDxx+2]);
+        REAL varX = 0.25*myVarX[idx];
+        a[idx] =       - varX*myDxx[idxDxx];
+        b[idx] = dtInv - varX*myDxx[idxDxx+1];
+        c[idx] =       - varX*myDxx[idxDxx+2];
     }
 }
 
@@ -192,10 +193,10 @@ __global__ void implicitYKernel(const unsigned outer, const unsigned numX, const
     if (i < outer && j < numX && k < numY) {
         int idx = i*(numX*numY)+j*numY+k;
         int idxDyy = i*(numY*4)+k*4;
-        REAL varY = myVarY[i*numX*numY+j*numY+k];
-        a[idx] =       - 0.5*(0.5*varY*myDyy[idxDyy]);
-        b[idx] = dtInv - 0.5*(0.5*varY*myDyy[idxDyy+1]);
-        c[idx] =       - 0.5*(0.5*varY*myDyy[idxDyy+2]);
+        REAL varY = 0.25*myVarY[idx];
+        a[idx] =       - varY*myDyy[idxDyy];
+        b[idx] = dtInv - varY*myDyy[idxDyy+1];
+        c[idx] =       - varY*myDyy[idxDyy+2];
     }
 }
 
