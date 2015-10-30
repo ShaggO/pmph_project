@@ -108,14 +108,13 @@ void   run_OrigCPU(...
 The other necessary modifications were to simply update the relevant variable references, for example, changing \texttt{globs.myResult[j][k]} to\\ \texttt{globArr[i].myResult[j][k]}.
 \subsubsection{Correctness}
 The reason we are allowed to do this is because we are not fundamentally changing anything about the flow of the program. Moving all of the functions together does nothing to program flow, only impeding readability slightly. For the hoisted variables, the extra dimension can be easily compared to a new variable per iteration, and since the variables are moving outwards in scope, nothing vital is changed. There is no danger of loop dependencies, since each iteration still uses their own indexes for these hoisted variables.
+
 After this work, the program is in a state to distribute the various loops. There is a mild amount of slowdown, since we allocate more memory to some of the variables, and we perform some initial calculations which otherwise performed per loop iteration. This is not a good stopping point, but it is necessary to continue.
 \subsection{Kernel Replacement}
 \subsubsection{The Idea}
 After loop distribution, we began to convert the loops to CUDA kernels. These kernels are copied almost directly from the already existing CPU code. This allowed us to begin using the GPU, and CUDA.
 \subsubsection{The Work}
-For each of the distributed loops, we na\"ivly translated the code into a CUDA kernel. That is, we attempted to rewrite the functions so that they performed precisely the same task on the GPU as they did on the CPU. Figures \ref{fig:nokernel} and \ref{fig:yeskernel}, show the conversion of the function \texttt{void setPayoff} from ProjCoreOrig.cpp into the \texttt{\_\_global\_\_ void setPayoffKernel} in the file ProjKernels.cu.h.
-
-All distributed loops and matching functions were converted. The majority of the work was 
+For each of the distributed loops, we na\"ivly translated the code into a CUDA kernel. That is, we attempted to rewrite the functions so that they performed precisely the same task on the GPU as they did on the CPU. Figures \ref{fig:nokernel} and \ref{fig:yeskernel}, show the conversion of the function \texttt{void setPayoff} from ProjCoreOrig.cpp into the \texttt{\_\_global\_\_ void setPayoffKernel} in the file ProjKernels.cu.h. All distributed loops and matching functions were converted.
  \begin{figure}[h]
 	\begin{lstlisting}
 void setPayoff(const REAL strike, PrivGlobs& globs )
@@ -152,13 +151,34 @@ __global__ void setPayoffKernel(
 	\caption{ \label{fig:yeskernel} The equivalent CUDA kernel.}
 \end{figure}
 
+The next step was to load the appropriate variables to and from memory. figure \ref{fig:cudamemcopy} shows some of the variables that are now on device memory, to be accessed by the kernels. This is analogous to the \texttt{globs} structures from the sequential code.
+
+\begin{figure}[h]
+	\begin{lstlisting}
+// Arrays for rollback:
+REAL* d_a, *d_b, *d_c, *d_y, *d_yy; // [outer][max(numX,numY)]
+REAL *d_v, *d_u;
+cudaMalloc((void**) &d_a, sizeof(REAL)*outer*numX*numY);
+cudaMalloc((void**) &d_b, sizeof(REAL)*outer*numX*numY);
+cudaMalloc((void**) &d_c, sizeof(REAL)*outer*numX*numY);
+cudaMalloc((void**) &d_y, sizeof(REAL)*outer*numX*numY);
+cudaMalloc((void**) &d_yy, sizeof(REAL)*outer*numX*numY);
+cudaMalloc((void**) &d_u, sizeof(REAL)*outer*numX*numY);
+cudaMalloc((void**) &d_v, sizeof(REAL)*outer*numY*numX);
+REAL * timeline = (REAL*) malloc(sizeof(REAL)*numT);
+cudaMemcpy(timeline,d_globs.myTimeline,sizeof(REAL)*numT,cudaMemcpyDeviceToHost);
+	\end{lstlisting}
+	\caption{ \label{fig:cudamemcopy} Initializing device memory.}
+\end{figure}
+
 \subsubsection{Correctness}
-It is no longer as easy to argue that this is a simple replacement. Transforming the distributed loops into Well, it's just direct translation
+It is no longer as easy to argue that this is a simple replacement. Transforming the distributed loops into kernels requires that the syntax has to change, and the semantics as well. The example in figure \ref{fig:yeskernel} shows that the loop iteration has been replaced by \texttt{threadIdx}; at a fundamental level, we are moving from sequential loops to parallel threads. The equations are the same, with a slightly more complicated index (\texttt{threadIdx} instead of a simple \texttt{i}), and the variables are now all loaded into GPU memory.
 
-the problem was, that the first CUDA call of the program also loads the entire CUDA runtime library, which gives a major overhead compared to the actual running time on our datasets.
+There are two arguments for correctness. The first is that although the semantics and syntax have both changed, from distributed loops to threads, the process is a one-to-one mapping. Every kernel can be directly traced back to a loop, and every loop gave rise to a single kernel. As long as the input and output of the kernels and loops is the same, we have the same program.
 
-so the timings we saw earlier were highly dominated by the cuda library loadtime
-we've added a "cudaFree(0);" line in the ProjectMain before we start timing the execution
+The second is that we continuously validated the GPU kernels during the programming by copying intermediate CPU results to the GPU, calculating the GPU kernel results, and then comparing them to the CPU results. That is, each step was substituted piecewise to ensure that they functioned the same.
+
+Although the program has now been distributed to the GPU, the runtime of the entire program took a hit. The problem was, that the first CUDA call of the program also loads the entire CUDA runtime library, which gives a major overhead compared to the actual running time on our datasets. Timing early versions of our code was highly dominated by the CUDA library load time. To combat this, we have added a \texttt{cudaFree(0);} line in the ProjectMain.cu before we start timing.
 \subsection{TRIDAG}
 \subsubsection{The Idea}
 \subsubsection{The Work}
