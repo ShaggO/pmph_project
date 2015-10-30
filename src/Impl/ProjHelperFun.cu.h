@@ -39,14 +39,15 @@ struct DevicePrivGlobs {
                                          const unsigned int& numX,
                                          const unsigned int& numY,
                                          const unsigned int& numT ) {
-        cudaMalloc((void**)&this->myX, sizeof(REAL)*outer*numX);
-        cudaMalloc((void**)&this->myY, sizeof(REAL)*outer*numY);
-        cudaMalloc((void**)&this->myTimeline, sizeof(REAL)*outer*numT);
-        cudaMalloc((void**)&this->myResult, sizeof(REAL)*outer*numX*numY);
-        cudaMalloc((void**)&this->myVarX, sizeof(REAL)*outer*numX*numY);
-        cudaMalloc((void**)&this->myVarY, sizeof(REAL)*outer*numX*numY);
-        cudaMalloc((void**)&this->myDxx, sizeof(REAL)*outer*numX*4);
-        cudaMalloc((void**)&this->myDyy, sizeof(REAL)*outer*numY*4);
+        int outer_size = sizeof(REAL)*outer;
+        cudaMalloc((void**)&this->myX,          outer_size*numX);
+        cudaMalloc((void**)&this->myY,          outer_size*numY);
+        cudaMalloc((void**)&this->myTimeline,   outer_size*numT);
+        cudaMalloc((void**)&this->myResult,     outer_size*numX*numY);
+        cudaMalloc((void**)&this->myVarX,       outer_size*numX*numY);
+        cudaMalloc((void**)&this->myVarY,       outer_size*numX*numY);
+        cudaMalloc((void**)&this->myDxx,        outer_size*numX*4);
+        cudaMalloc((void**)&this->myDyy,        outer_size*numY*4);
     }
 
     __device__ __host__ ~DevicePrivGlobs() {
