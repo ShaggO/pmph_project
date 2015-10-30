@@ -246,10 +246,10 @@ void explicitX(
         DevicePrivGlobs &globs
         )
 {
-    const unsigned dimx = outer; //ceil((float) outer / T);
+    const unsigned dimx = ceil((float) outer / T);
     const unsigned dimy = ceil((float) numX / T);
     const unsigned dimz = ceil((float) numY / T);
-    const dim3 block(T,T,1), grid(dimy,dimz,dimx);
+    const dim3 block(T,T,T), grid(dimy,dimz,dimx);
 
     explicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, u, globs.myVarX, globs.myResult, globs.myDxx);
     cudaThreadSynchronize();
@@ -269,7 +269,7 @@ void explicitY(
     const unsigned dimx = ceil((float) outer / T);
     const unsigned dimy = ceil((float) numX / T);
     const unsigned dimz = ceil((float) numY / T);
-    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    const dim3 block(T,T,T), grid(dimy,dimz,dimx);
 
     explicitYKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, v, u, globs.myVarY, globs.myResult, globs.myDyy);
     cudaThreadSynchronize();
@@ -286,7 +286,7 @@ void deviceImplicitX(const unsigned outer, const unsigned numX, const unsigned n
     const unsigned dimx = ceil(((float) outer) / T);
     const unsigned dimy = ceil(((float) numY) / T);
     const unsigned dimz = ceil(((float) numX) / T);
-    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    const dim3 block(T,T,T), grid(dimy,dimz, dimx);
     implicitXKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, globs.myVarX, globs.myDxx, a, b, c);
     cudaThreadSynchronize();
 }
@@ -305,7 +305,7 @@ void deviceImplicitY(const unsigned outer, const unsigned numX, const unsigned n
     const unsigned dimx = ceil(((float) outer) / T);
     const unsigned dimy = ceil(((float) numX) / T);
     const unsigned dimz = ceil(((float) numY) / T);
-    const dim3 block(T,T,T), grid(dimx,dimy,dimz);
+    const dim3 block(T,T,T), grid(dimy,dimz, dimx);
     implicitYKernel<T><<<grid, block>>>(outer, numX, numY, dtInv, globs.myVarY, globs.myDyy, a, b, c);
     cudaThreadSynchronize();
     implicitYKernelY<T><<<grid, block>>>(outer, numX, numY, dtInv, u, v, y);

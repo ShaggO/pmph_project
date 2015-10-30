@@ -134,9 +134,9 @@ __global__ void explicitYKernel(
         REAL* myDyy
         )
 {
-    int i = blockIdx.x*T + threadIdx.x; // outer
-    int j = blockIdx.y*T + threadIdx.y; // myX.size
-    int k = blockIdx.z*T + threadIdx.z; // myY.size
+    int j = blockIdx.x*blockDim.x + threadIdx.x; // outer
+    int k = blockIdx.y*blockDim.y + threadIdx.y; // myX.size
+    int i = blockIdx.z*blockDim.z + threadIdx.z; // myY.size
     if (i < outer && j < numX && k < numY) {
         // v[outer][numX][numY]
         int idx = i*numX*numY + j*numY + k;
@@ -164,9 +164,9 @@ __global__ void implicitXKernel(const unsigned outer, const unsigned numX, const
         REAL* b,
         REAL* c)
 {
-    int i = blockIdx.x*T + threadIdx.x;
-    int k = blockIdx.y*T + threadIdx.y;
-    int j = blockIdx.z*T + threadIdx.z;
+    int k = blockIdx.x*blockDim.x + threadIdx.x;
+    int j = blockIdx.y*blockDim.y + threadIdx.y;
+    int i = blockIdx.z*blockDim.z + threadIdx.z;
     if (i < outer && j < numX && k < numY) {
         int idx = i*(numX*numY)+j*numY+k;
         int idxDxx = i*(numX*4)+j*4;
@@ -186,9 +186,9 @@ __global__ void implicitYKernel(const unsigned outer, const unsigned numX, const
         REAL* b,
         REAL* c)
 {
-    int i = blockIdx.x*T + threadIdx.x;
-    int j = blockIdx.y*T + threadIdx.y;
-    int k = blockIdx.z*T + threadIdx.z;
+    int j = blockIdx.x*blockDim.x + threadIdx.x;
+    int k = blockIdx.y*blockDim.y + threadIdx.y;
+    int i = blockIdx.z*blockDim.z + threadIdx.z;
     if (i < outer && j < numX && k < numY) {
         int idx = i*(numX*numY)+j*numY+k;
         int idxDyy = i*(numY*4)+k*4;
@@ -206,9 +206,9 @@ __global__ void implicitYKernelY(const unsigned outer, const unsigned numX, cons
         REAL* v,
         REAL* y)
 {
-    int i = blockIdx.x*T + threadIdx.x;
-    int j = blockIdx.y*T + threadIdx.y;
-    int k = blockIdx.z*T + threadIdx.z;
+    int j = blockIdx.x*blockDim.x + threadIdx.x;
+    int k = blockIdx.y*blockDim.y + threadIdx.y;
+    int i = blockIdx.z*blockDim.z + threadIdx.z;
     if (i < outer && j < numX && k < numY) {
         int idx = i*numX*numY+j*numY+k;
         y[idx] = dtInv*u[idx] - 0.5*v[idx];

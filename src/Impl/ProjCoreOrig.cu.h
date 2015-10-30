@@ -300,7 +300,7 @@ void   run_optimGPU(
         // GPU version
         //cpGlob2Gpu(globArr,outer,numX,numY,numT,d_globs); // made for copying of globs
         gettimeofday(&t_start, NULL);
-        explicitX<T2D>(outer, numX, numY, dtInv, d_tu, d_globs);
+        explicitX<T3D>(outer, numX, numY, dtInv, d_tu, d_globs);
         gettimeofday(&t_end, NULL);
         timeval_subtract(&t_diff, &t_end, &t_start);
         e_eX += (t_diff.tv_sec*1e6+t_diff.tv_usec);
