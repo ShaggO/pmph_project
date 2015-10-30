@@ -1,12 +1,12 @@
 CXX        = nvcc
 LIB        = -L$(OPENCL_LIBDIR) -lOpenCL
-CXXFLAGS   = -Xcompiler -fopenmp -O3 -DWITH_FLOATS=1
+CXXFLAGS   = -O3 -DWITH_FLOATS=1
 
 INCLUDES    += -I ../include
 GPU_OPTS   = -D lgWARP=5
 
 SOURCES_CPP =ProjectMain.cu ProjHelperFun.cu
-HELPERS     =ProjHelperFun.cu.h ../include/Constants.h ../include/ParseInput.h ../include/ParserC.h ../include/OpenmpUtil.h ProjCoreOrig.cu.h ProjKernels.cu.h TridagKernel.cu.h
+HELPERS     =ProjHelperFun.cu.h ../include/Constants.h ../include/ParseInput.h ../include/ParserC.h ProjCoreOrig.cu.h ProjKernels.cu.h TridagKernel.cu.h
 EXECUTABLE  =runproject
 
 

@@ -12,6 +12,7 @@
 \usepackage{cite}
 \usepackage{courier}
 \usepackage{pdflscape}
+\usepackage{multirow}
 \usepackage{booktabs}
 \usepackage{listings}
 \usepackage[usenames,dvipsnames]{color}
@@ -110,11 +111,14 @@ for (int i = 0; i<max; i++){
 		
 The purpose of this is twofold. First, this allows us to serialize a computation which would otherwise be repeated by every thread. By computing it beforehand, the threads can be spared this extra work. Second, this allows us to easily parallelize the inner loops. Since each iteration of the inner \texttt{j} loop requires access to a single \texttt{tmpA} per iteration of the \texttt{i} loop, we would have to compute it, then pass it on as a variable to each of the threads. In the hoisted version, \texttt{tmpA[]} is copied to device memory, so that the inner loop can just access the appropriate version without much trouble.
 \subsubsection{The Work}
-The first step for us was to begin preparing the CPU for kernel parallelization. Before distributing the outer loops in ProjCoreOrig.cpp, we began by moving all of the secondary functions (\texttt{void updateParams}, \texttt{void setPayoff}, \texttt{REAL value}, and \texttt{void rollback}) into \texttt{void run\_OrigCPU}. This allowed us to easily see the globs and their relations to one another.
+The first step for us was to begin preparing the CPU for kernel parallelization. Before distributing the outer loops in ProjCoreOrig.cpp, we began by moving all of the secondary functions (\texttt{updateParams}, \texttt{setPayoff}, \texttt{value}, and \texttt{rollback}) into \texttt{run\_OrigCPU}. This allowed us to easily see the globs and their relations to one another.
 		
 The work at this step is temporary. The code is objectively de-optimized, since more time is spent on initializing arrays, memory usage is larger, and the code runs slower. The purpose of this is to prepare the code for optimal loop distribution.
 		
-The \texttt{REAL strike} variable has been removed, being placed instead inside of one of the kernels. The variables which have been hoisted at this step are listed in figure \ref{fig:globs}.
+The \texttt{strike} variable has been removed, being placed instead inside of one of the kernels. The variables which have been hoisted at this step are listed in figure \ref{fig:globs}.
+
+TODO: Something about look distribution
+
 \begin{figure}[h]
 \begin{lstlisting}
 void   run_OrigCPU(...
@@ -144,24 +148,26 @@ void   run_OrigCPU(...
 The other necessary modifications were to simply update the relevant variable references, for example, changing \texttt{globs.myResult[j][k]} to\\ \texttt{globArr[i].myResult[j][k]}.
 \subsubsection{Correctness}
 The reason we are allowed to do this is because we are not fundamentally changing anything about the flow of the program. Moving all of the functions together does nothing to program flow, only impeding readability slightly. For the hoisted variables, the extra dimension can be easily compared to a new variable per iteration, and since the variables are moving outwards in scope, nothing vital is changed. There is no danger of loop dependencies, since each iteration still uses their own indexes for these hoisted variables.
+
+TODO: Loop distribution correctness: maps
 			
 After this work, the program is in a state to distribute the various loops. There is a mild amount of slowdown, since we allocate more memory to some of the variables, and we perform some initial calculations which otherwise performed per loop iteration. This is not a good stopping point, but it is necessary to continue.
 \subsection{Kernel Replacement}
 \subsubsection{The Idea}
 After loop distribution, we began to convert the loops to CUDA kernels. These kernels are copied almost directly from the already existing CPU code. This allowed us to begin using the GPU, and CUDA.
 \subsubsection{The Work}
-For each of the distributed loops, we na\"ivly translated the code into a CUDA kernel. That is, we attempted to rewrite the functions so that they performed precisely the same task on the GPU as they did on the CPU. Figures \ref{fig:nokernel} and \ref{fig:yeskernel}, show the conversion of the function \texttt{void setPayoff} from ProjCoreOrig.cpp into the \texttt{\_\_global\_\_ void setPayoffKernel} in the file ProjKernels.cu.h. All distributed loops and matching functions were converted.
+For each of the distributed loops, we na\"ivly translated the code into a CUDA kernel. That is, we attempted to rewrite the functions so that they performed precisely the same task on the GPU as they did on the CPU. Figures \ref{fig:nokernel} and \ref{fig:yeskernel}, show the conversion of the function \texttt{setPayoff} from ProjCoreOrig.cpp into the \texttt{setPayoffKernel} in the file ProjKernels.cu.h. All distributed loops and matching functions were converted.
 \begin{figure}[h]
 	\begin{lstlisting}
-void setPayoff(const REAL strike, PrivGlobs& globs )
-{
-	for(unsigned i=0;i<globs.myX.size();++i)
-	{
-		REAL payoff = max(globs.myX[i]-strike, (REAL)0.0);
-		for(unsigned j=0;j<globs.myY.size();++j)
-			globs.myResult[i][j] = payoff;
-	}
-}
+ for(unsigned i = 0; i < outer; ++ i) {
+        for(unsigned j=0;j<globArr[i].myX.size();++j)
+        {
+            for(unsigned k=0;k<globArr[i].myY.size();++k)
+            {
+                globArr[i].myResult[j][k] = max(globArr[i].myX[j]-0.001*i, (REAL)0.0); // privatized one level in
+            }
+        }
+    }
 \end{lstlisting}
 \caption{ \label{fig:nokernel} The distributed loop implementation of \texttt{void setPayoff}.}
 \end{figure}
@@ -187,11 +193,11 @@ __global__ void setPayoffKernel(
 \caption{ \label{fig:yeskernel} The equivalent CUDA kernel.}
 \end{figure}
 					
-The next step was to load the appropriate variables to and from memory. figure \ref{fig:cudamemcopy} shows some of the variables that are now on device memory, to be accessed by the kernels. This is analogous to the \texttt{globs} structures from the sequential code.
+The next step was to load the appropriate variables to and from memory. Figure \ref{fig:cudamemcopy} shows some of the variables that are now on device memory, to be accessed by the kernels. This is analogous to the \texttt{PrivGlobs} structures from the sequential code.
 					
 \begin{figure}[h]
 \begin{lstlisting}
-// Arrays for rollback:
+// Arrays for rollback
 REAL* d_a, *d_b, *d_c, *d_y, *d_yy; // [outer][max(numX,numY)]
 REAL *d_v, *d_u;
 cudaMalloc((void**) &d_a, sizeof(REAL)*outer*numX*numY);
@@ -210,13 +216,11 @@ cudaMemcpy(timeline,d_globs.myTimeline,sizeof(REAL)*numT,cudaMemcpyDeviceToHost)
 \subsubsection{Correctness}
 It is no longer as easy to argue that this is a simple replacement. Transforming the distributed loops into kernels requires that the syntax has to change, and the semantics as well. The example in figure \ref{fig:yeskernel} shows that the loop iteration has been replaced by \texttt{threadIdx}; at a fundamental level, we are moving from sequential loops to parallel threads. The equations are the same, with a slightly more complicated index (\texttt{threadIdx} instead of a simple \texttt{i}), and the variables are now all loaded into GPU memory.
 						
-There are two arguments for correctness. The first is that although the semantics and syntax have both changed, from distributed loops to threads, the process is a one-to-one mapping. Every kernel can be directly traced back to a loop, and every loop gave rise to a single kernel. As long as the input and output of the kernels and loops is the same, we have the same program.
-						
-The second is that we continuously validated the GPU kernels during the programming by copying intermediate CPU results to the GPU, calculating the GPU kernel results, and then comparing them to the CPU results. That is, each step was substituted piecewise to ensure that they functioned the same.
+The semantics and syntax have both changed from distributed loops to threads but the process is a one-to-one mapping. Every kernel can be directly traced back to a loop, and every loop gave rise to a single kernel. As long as the input and output of the kernels and loops is the same, we have the same program.
 						
 Although the program has now been distributed to the GPU, the runtime of the entire program took a hit. The problem was, that the first CUDA call of the program also loads the entire CUDA runtime library, which gives a major overhead compared to the actual running time on our datasets. Timing early versions of our code was highly dominated by the CUDA library load time. To combat this, we have added a \texttt{cudaFree(0);} line in the ProjectMain.cu before we start timing.
 \subsection{TRIDAG}
-The \texttt{tridag} algorithm is a tridiagonal solver, used in systems of continuous differential equations when solved using something known as the Crank-Nicholson finite-difference method. The solution involves large matrix multiplications for the many iterations the finite-differences require, and thus seems like a prime candidate for GPU parallelization. The only problem is that each iteration requires knowledge about the previous iteration, and thus, it is \emph{not} natively fit for parallelization. However, using some variable substitution, we are able to get \texttt{tridag} into a form where we can turn the entire algorithm into a series of \texttt{scanInc} operations.
+The \texttt{tridag} algorithm is a tridiagonal solver, used in systems of continuous differential equations when solved using something known as the Crank-Nicholson finite-difference method. The solution involves large matrix multiplications for the many iterations the finite-differences require, and thus seems like a prime candidate for GPU parallelization. The only problem is that each iteration requires knowledge about the previous iteration, and thus, it is \emph{not} natively fit for parallelization. However, using some variable substitution, we are able to get \texttt{tridag} into a form where we can turn the entire algorithm into a series of scan inclusive operations.
 \subsubsection{The Idea}
 The original \texttt{tridag} implementation worked by finding a solution to the matrix equation \[A_{n\times n}\times X_{n \times 1} = D_{n \times 1}\]
 where the \(A\) matrix has the information in a diagonal fashion, \(D\) is known, and we are tasked with finding \(X\). Instead, we are going to perform a matrix decomposition, such that \(A = L \times U\) where \(L\) is a lower diagonal matrix, and \(U\) is an upper diagonal matrix. Then, the algorithm is broken into 3 steps. 1: The \(LU\) decomposition is calculated. 2: \(L \times Y = D\) is solved. 3: \(U \times X = Y\) is solved. The algorithm using \texttt{scanInc}, which calculates \(U\) in step 1, is then as follows, lifted from the slides\textsuperscript{\cite{l5slides}}:
@@ -228,32 +232,37 @@ In addition to the \texttt{scanInc} implementation, we also made several optimiz
 
 Whenever there were consecutive \texttt{+=} operations in \texttt{explicitX} and \texttt{explicitY}, we created a local variable to hold the value until the final \texttt{+=} operation.
 
-Some of the kernels are computed transposed, and some use transposed inputs as compared to the original: \texttt{explicitX},  \texttt{explicitY},  \texttt{implicitX}, and \texttt{implicitY}; some of the variables are also transposed: \texttt{U}, \texttt{A}, \texttt{B}, and \texttt{C}. The order of these operations is listed in figure \ref{fig:trcode}.
-\begin{figure}[h]
-\begin{lstlisting}
-1. explicitX -> trU
-2. explicitY(trU) -> trU
-3. trU->U
-4. implicitX->trA,trB,trC
-5. trA -> A, trB -> B, trC -> C
-6. tridag(U) -> U
-7. U -> trU
-8. implicitY(trU)
-9. tridag
-\end{lstlisting}
-\caption{\label{fig:trcode} The transposed variables and functions, where \texttt{trX} means "the transpose of X."}
-\end{figure}
+The following changes are performed in order to achieve memory coalesced access in our CUDA kernels:
+\begin{description}
+\item[explicitX] is changed to compute the transpose of \texttt{u}.
+\item[explicitY] writes directly to the transpose of \texttt{u}.
+\item[implicitX] computes the transpose of \texttt{a}, \texttt{b}, and \texttt{c}.
+\item[tridag] is called on \texttt{u}, \texttt{a}, \texttt{b}, and \texttt{c}, and thus these four arrays are transposed before calling the first \texttt{tridag}.
+\item[implicitY] needs to use the transpose of \texttt{u}. \texttt{Tridag} however wrote to \texttt{u}, and thus we must transpose the new value of \texttt{u}.
+\end{description}
+
 \subsubsection{Correctness}
 Several variables are moved to shared memory, some of the kernels are computed transposed, and some use transposed inputs as compared to the original: \texttt{explicitX} calculates \texttt{u} transposed; \texttt{explicitY} accumulates values into \texttt{u} transposed; \texttt{implicitX} calculates transposed \texttt{a}, \texttt{b}, and \texttt{c}, followed by transposing the results (so that we receive standard \texttt{a}, \texttt{b}, and \texttt{c}); \texttt{implicitY} uses the transposed \texttt{u} (\texttt{u} is modified by the first \texttt{tridag} call before \texttt{implicitY} is calculated), so \texttt{u} is transposed just before \texttt{implicitY} is called.
 
 We are assured of the correctness of these modifications. We know that the variables we moved to shared memory were not going to cause race conditions, since they are accessed as read variables. The transposed/regular variables do not matter as long as the calculations work the same, and for some of the operations it is easier to perform them with a transposed version of the matrices.
-
-Finally, the GPU program was constantly validated against the CPU implementation.
 \section{Results}
+Table \ref{fig:results} shows the total execution times for the four versions of the code: Sequential CPU, OpenMP CPU, Na\"ive CUDA, and Optimized CUDA for both the small and large dataset. We have deliberately excluded the medium dataset since the \texttt{tridag} CUDA kernel only runs on datasets matching the dimensions of the CUDA kernel.
 \subsection{Comparisons}
-\begin{figure}[h]
+\begin{table}[h]
+\centering
+\begin{tabular}{l r r}
+\toprule
+\multirow{2}{*}{Version}	& \multicolumn{2}{c}{Total execution time (microseconds)} \\
+					& Small		& Large \\				
+\midrule
+Sequential CPU		& 2297659	& 216305907 \\
+OpenMP CPU			& 213948		& 10132446 \\
+Na\"ive CUDA			& &\\
+Optimized CUDA		& 60867		& 3647836 \\
+\bottomrule
+\end{tabular}
 \caption{\label{fig:results} Results of the three different implementations.}
-\end{figure}
+\end{table}
 \subsection{Conclusion}
 \bibliographystyle{plain}
 \bibliography{bibliography}
