@@ -117,7 +117,9 @@ The work at this step is temporary. The code is objectively de-optimized, since 
 		
 The \texttt{strike} variable has been removed, being placed instead inside of one of the kernels. The variables which have been hoisted at this step are listed in figure \ref{fig:globs}.
 
-TODO: Something about look distribution
+We interchanged the \texttt{outer} loop inwards and distributed it, so that all
+secondary functions got an extra dimension. Giving us the possibility to create
+3D kernels later on.
 
 \begin{figure}[h]
 \begin{lstlisting}
@@ -149,7 +151,10 @@ The other necessary modifications were to simply update the relevant variable re
 \subsubsection{Correctness}
 The reason we are allowed to do this is because we are not fundamentally changing anything about the flow of the program. Moving all of the functions together does nothing to program flow, only impeding readability slightly. For the hoisted variables, the extra dimension can be easily compared to a new variable per iteration, and since the variables are moving outwards in scope, nothing vital is changed. There is no danger of loop dependencies, since each iteration still uses their own indexes for these hoisted variables.
 
-TODO: Loop distribution correctness: maps
+Distributing the \texttt{outer} loop inwards is also allowed as the loop is
+parallel and a parallel loop can always be interchanged inwards. Distributing
+the loop is also allowed as all loops inside the \texttt{outer} loop will still
+be inside an \texttt{outer} loop.
 			
 After this work, the program is in a state to distribute the various loops. There is a mild amount of slowdown, since we allocate more memory to some of the variables, and we perform some initial calculations which otherwise performed per loop iteration. This is not a good stopping point, but it is necessary to continue.
 \subsection{Kernel Replacement}
@@ -223,10 +228,51 @@ Although the program has now been distributed to the GPU, the runtime of the ent
 The \texttt{tridag} algorithm is a tridiagonal solver, used in systems of continuous differential equations when solved using something known as the Crank-Nicholson finite-difference method. The solution involves large matrix multiplications for the many iterations the finite-differences require, and thus seems like a prime candidate for GPU parallelization. The only problem is that each iteration requires knowledge about the previous iteration, and thus, it is \emph{not} natively fit for parallelization. However, using some variable substitution, we are able to get \texttt{tridag} into a form where we can turn the entire algorithm into a series of scan inclusive operations.
 \subsubsection{The Idea}
 The original \texttt{tridag} implementation worked by finding a solution to the matrix equation \[A_{n\times n}\times X_{n \times 1} = D_{n \times 1}\]
-where the \(A\) matrix has the information in a diagonal fashion, \(D\) is known, and we are tasked with finding \(X\). Instead, we are going to perform a matrix decomposition, such that \(A = L \times U\) where \(L\) is a lower diagonal matrix, and \(U\) is an upper diagonal matrix. Then, the algorithm is broken into 3 steps. 1: The \(LU\) decomposition is calculated. 2: \(L \times Y = D\) is solved. 3: \(U \times X = Y\) is solved. The algorithm using \texttt{scanInc}, which calculates \(U\) in step 1, is then as follows, lifted from the slides\textsuperscript{\cite{l5slides}}:
-\begin{figure}[h]
-\includegraphics{images/parallelizing}
-\end{figure}
+where the \(A\) matrix has the information in a diagonal fashion, \(D\) is known, and we are tasked with finding \(X\). Instead, we are going to perform a matrix decomposition, such that \(A = L \times U\) where \(L\) is a lower diagonal matrix, and \(U\) is an upper diagonal matrix. Then, the algorithm is broken into 3 steps. 1: The \(LU\) decomposition is calculated. 2: \(L \times Y = D\) is solved. 3: \(U \times X = Y\) is solved. The algorithm using \texttt{scanInc}, which calculates \(U\) in step 1, is then as follows.
+We see the recurrence:
+\begin{align}
+    u_0 &= b_0 \\
+    u_i &= b_i - \dfrac{(a_{i - 1} * c_{i - 1})}{u_{i-1}}, i \in \{1 \ldots n-1\}
+\end{align}
+If we then substitude $u_i$ with $\dfrac{q_{i+1}}{q_i}$ where $q_1 = b_0$ and
+$q_0 = 1.0$, then $u_0 = b_0$ still hold and we have:
+\begin{equation}
+    \begin{bmatrix}
+        q_{i+i} \\
+        q_i
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        b_i & -a_{i - 1} * c_{i - 1} \\
+        1.0 & 0.0
+    \end{bmatrix}
+    *
+    \begin{bmatrix}
+        q_{i} \\
+        q_{i - 1}
+    \end{bmatrix}
+    , i \in \{1 \ldots n-1\}
+\end{equation}
+If then denote the above 2-by-2 matrix by $S_i$ we can then write $S_{i + 1}$ as
+$(S_i * S_{i - 1} * S_1$ and then we have this:
+\begin{equation}
+    \begin{bmatrix}
+        q_{i+i} \\
+        q_i
+    \end{bmatrix}
+    =
+    (S_i * S_{i - 1} * S_1)
+    *
+    \begin{bmatrix}
+        b_{0} \\
+        1.0
+    \end{bmatrix}
+\end{equation}
+All of the matrices $S_i * S_{i - 1} * S_1$ with $i \in \{1 \ldots n-1\}$ can
+then be calculated with a scan inclusive and a matrix multiplication operator.
+When we have $q_{i+1}$ and $q_i$, we can then calculate $u_i$ as
+$u_i = \dfrac{q_{i+1}}{q_i}$.
+
 \subsubsection{The Work}
 In addition to the \texttt{scanInc} implementation, we also made several optimizations. Many of the changes are minor, and include re-using shared memory. Both \texttt{u} and \texttt{uu} have been moved to shared memory.
 
@@ -266,4 +312,4 @@ Optimized CUDA      & 60867     & 3647836   \\
 \subsection{Conclusion}
 \bibliographystyle{plain}
 \bibliography{bibliography}
-\end{document}          
+\end{document}
