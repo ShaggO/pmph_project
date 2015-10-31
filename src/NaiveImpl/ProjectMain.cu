@@ -20,7 +20,7 @@ int main()
 
     cudaFree(0);
     {   // Original Program (Sequential CPU Execution)
-        cout<<"\n// Running Optimized, Parallel Project Program"<<endl;
+        cout<<"\n// Running Naïve, Parallel Project Program"<<endl;
 
         unsigned long int elapsed = 0;
         struct timeval t_start, t_end, t_diff;
