@@ -322,9 +322,9 @@ The benefits of parallelism are readily apparent in the table. For the small dat
 
 For the large data set, we can see even bigger speedup. The OpenMP CPU runs 21 times faster than sequential. The Optimized CUDA runs almost 60 times faster than Sequential CPU.
 
-That is a massive speedup, although the tradeoff is that the algorithm is significantly more complex. The sequential implementation has a total of 438 lines of code, while the optimized code is sitting in at 1365 lines. There is a lot more work involved in converting to CUDA. By comparison, the OpenMP CPU change required only a single line added, and two lines moved. It has a total length of 439 lines of code.
+That is a massive speedup, although the trade-off is that the algorithm is significantly more complex. The sequential implementation has a total of 438 lines of code, while the optimized code is sitting in at 1365 lines. There is a lot more work involved in converting to CUDA. By comparison, the OpenMP CPU change required only a single line added, and two lines moved. It has a total length of 439 lines of code.
 
-The conclusion to be drawn from this is that if you are going to run large algorithms many, many times, then it is absolutely worth it to build and optimize GPU code. However, for an intermediate speedup, converting to OpenMP can provide quite respectable improvements, and depending on the code structure, does not necessarily require a large investment of time to implement. As always, there is a trade-off between coding time and run time, but the OpenMP transition can be very effective.
+The conclusion to be drawn from this is that if you are going to run large algorithms many, many times, then it is absolutely worth it to build and optimize GPU code. However, for an intermediate speedup, converting to OpenMP can provide quite respectable improvements, and depending on the code structure, does not necessarily require a large investment of time to implement. As always, there is a trade-off between coding time and run time. The OpenMP transition can be a cheap, effective speedup, but for truly quick code, nothing beats an optimized CUDA implementation.
 \bibliographystyle{plain}
 \bibliography{bibliography}
 \end{document}
