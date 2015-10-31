@@ -67,7 +67,7 @@
 \begin{document}
 	\maketitle
 \section{Project Specifications}
-The group project for the course Programming Massively Parallel Hardware is about parallelizing a serial implementation of \texttt{tridag}, contained in the files ProjCoreOrig.cpp, ProjectMain.cpp, ProjHelperFun.cpp, and ProjHelperFun.h. The project consists of three parts: converting to OpenMP parallel, converting to CUDA parallel, and results. We will be comparing the CUDA and OpenMP implementation with the original code. These optimizations and translations were done with the help of the slides from the course, listed in the bibliography. \textsuperscript{\cite{l5slides}\cite{flattening}\cite{projectslides}}
+The group project for the course Programming Massively Parallel Hardware is about parallelizing a serial program, contained in the files ProjCoreOrig.cpp, ProjectMain.cpp, ProjHelperFun.cpp, and ProjHelperFun.h. The project consists of three parts: converting to OpenMP parallel, converting to CUDA parallel (and optimizing), and results. We will be comparing the na\"ive and optimized CUDA and OpenMP implementations with the original code. These optimizations and translations were done with the help of the slides from the course, listed in the bibliography\textsuperscript{\cite{l5slides}\cite{flattening}\cite{projectslides}}.
 \section{OpenMP}
 \subsection{The Idea}
 Converting serial loops into parallel loops is as simple as ensuring that there are no loop dependencies. We must check that for every loop we wish to parallelize, that no iteration depends on the results of any other iteration, and that variables which belong to multiple iterations have either the correct scope, so that information does not pass from one iteration to the next, or a separate index for each iteration. After that, we denote the loop ready by adding the appropriate \texttt{\#pragma ...} command, and compiling with the correct options.
@@ -78,7 +78,7 @@ Converting the original code to OpenMP was a straightforward matter, involving o
 The changes we made were very minor, involving moving 2 variable declarations inwards in scope, and adding the \texttt{\#pragma ...} line. The variable declarations made no difference, since every iteration of the loop resulted in both \texttt{strike} and \texttt{globs} being immediately assigned new values, but moving them allowed for us to parallelize without worrying if the results of one iteration spilled over into another. The \texttt{\#pragma ...} declaration signaled that this loop was able to be run in parallel. We can assure that it was by looking through the code. From the outermost loop, there were no loop dependencies from one iteration to the next: the results were saved in separate \texttt{res[]} indexes, and no result from a previous iteration was used in a later iteration.
 \section{CUDA}
 \subsection{Preparations}
-The code as it stands can be na\"ively converted to CUDA, by replacing the inner loops with the exact same function inside a CUDA kernel. We are going to first implement this, and then continue by optimizing the TRIDAG kernel.
+The code as it stands can be na\"ively converted to CUDA (except \texttt{tridag}), by replacing the inner loops with the exact same function inside CUDA kernels. We are going to first implement this, optimize the na\"ive kernels, and then continue by optimizing the TRIDAG kernel.
 \subsection{Loop Distribution and Array Expansion}
 \subsubsection{The Idea}
 The first step was to conglomerate every secondary function, which allowed us to hoist the initialization of the globs (global variables) into glob arrays. That is, instead of initializing a temp variable or array for every iteration of a loop, we instead initialize an array one dimension larger, with size equal to the number of iterations of the loop, before the looping code.
@@ -149,7 +149,7 @@ void   run_OrigCPU(...
 			
 The other necessary modifications were to simply update the relevant variable references, for example, changing \texttt{globs.myResult[j][k]} to\\ \texttt{globArr[i].myResult[j][k]}.
 \subsubsection{Correctness}
-The reason we are allowed to do this is because we are not fundamentally changing anything about the flow of the program. Moving all of the functions together does nothing to program flow, only impeding readability slightly. For the hoisted variables, the extra dimension can be easily compared to a new variable per iteration, and since the variables are moving outwards in scope, nothing vital is changed. There is no danger of loop dependencies, since each iteration still uses their own indexes for these hoisted variables.
+The reason we are allowed to do this is because we are not fundamentally changing anything about the flow of the program. Moving all of the functions together does nothing to program flow, only impeding readability slightly. For the hoisted variables, the extra dimension can be easily compared to a new variable per iteration, and since the variables are moving outwards in scope, nothing vital is changed. There is no danger of loop dependencies, since each iteration still uses their own indices for these hoisted variables.
 
 Distributing the \texttt{outer} loop inwards is also allowed as the loop is
 parallel and a parallel loop can always be interchanged inwards. Distributing
@@ -224,19 +224,19 @@ It is no longer as easy to argue that this is a simple replacement. Transforming
 The semantics and syntax have both changed from distributed loops to threads but the process is a one-to-one mapping. Every kernel can be directly traced back to a loop, and every loop gave rise to a single kernel. As long as the input and output of the kernels and loops is the same, we have the same program.
 						
 Although the program has now been distributed to the GPU, the runtime of the entire program took a hit. The problem was, that the first CUDA call of the program also loads the entire CUDA runtime library, which gives a major overhead compared to the actual running time on our datasets. Timing early versions of our code was highly dominated by the CUDA library load time. To combat this, we have added a \texttt{cudaFree(0);} line in the ProjectMain.cu before we start timing.
-\subsection{TRIDAG}
-The \texttt{tridag} algorithm is a tridiagonal solver, used in systems of continuous differential equations when solved using something known as the Crank-Nicholson finite-difference method. The solution involves large matrix multiplications for the many iterations the finite-differences require, and thus seems like a prime candidate for GPU parallelization. The only problem is that each iteration requires knowledge about the previous iteration, and thus, it is \emph{not} natively fit for parallelization. However, using some variable substitution, we are able to get \texttt{tridag} into a form where we can turn the entire algorithm into a series of scan inclusive operations.
+\subsection{TRIDAG and optimizations}
+The \texttt{tridag} algorithm is a tridiagonal solver, used in systems of continuous differential equations when solved using something known as the Crank-Nicholson finite-difference method. The solution involves large matrix multiplications for the many iterations the finite-differences require, and thus seems like a prime candidate for GPU parallelization. The only problem is that each iteration requires knowledge about the previous iteration, and thus, it is \emph{not} natively fit for parallelization. However, using some variable substitution, we are able to get \texttt{tridag} into a form where we can turn the entire algorithm into a series of maps and scan inclusive operations.
 \subsubsection{The Idea}
 The original \texttt{tridag} implementation worked by finding a solution to the matrix equation \[A_{n\times n}\times X_{n \times 1} = D_{n \times 1}\]
 where the \(A\) matrix has the information in a diagonal fashion, \(D\) is known, and we are tasked with finding \(X\). Instead, we are going to perform a matrix decomposition, such that \(A = L \times U\) where \(L\) is a lower diagonal matrix, and \(U\) is an upper diagonal matrix. Then, the algorithm is broken into 3 steps. 1: The \(LU\) decomposition is calculated. 2: \(L \times Y = D\) is solved. 3: \(U \times X = Y\) is solved. The algorithm using \texttt{scanInc}, which calculates \(U\) in step 1, is then as follows.
 We see the recurrence:
-\begin{align}
+\begin{align*}
     u_0 &= b_0 \\
     u_i &= b_i - \dfrac{(a_{i - 1} * c_{i - 1})}{u_{i-1}}, i \in \{1 \ldots n-1\}
-\end{align}
-If we then substitude $u_i$ with $\dfrac{q_{i+1}}{q_i}$ where $q_1 = b_0$ and
+\end{align*}
+If we then substitute $u_i$ with $\dfrac{q_{i+1}}{q_i}$ where $q_1 = b_0$ and
 $q_0 = 1.0$, then $u_0 = b_0$ still hold and we have:
-\begin{equation}
+\begin{equation*}
     \begin{bmatrix}
         q_{i+i} \\
         q_i
@@ -252,10 +252,10 @@ $q_0 = 1.0$, then $u_0 = b_0$ still hold and we have:
         q_{i - 1}
     \end{bmatrix}
     , i \in \{1 \ldots n-1\}
-\end{equation}
+\end{equation*}
 If then denote the above 2-by-2 matrix by $S_i$ we can then write $S_{i + 1}$ as
 $(S_i * S_{i - 1} * S_1$ and then we have this:
-\begin{equation}
+\begin{equation*}
     \begin{bmatrix}
         q_{i+i} \\
         q_i
@@ -267,14 +267,17 @@ $(S_i * S_{i - 1} * S_1$ and then we have this:
         b_{0} \\
         1.0
     \end{bmatrix}
-\end{equation}
+\end{equation*}
 All of the matrices $S_i * S_{i - 1} * S_1$ with $i \in \{1 \ldots n-1\}$ can
 then be calculated with a scan inclusive and a matrix multiplication operator.
 When we have $q_{i+1}$ and $q_i$, we can then calculate $u_i$ as
 $u_i = \dfrac{q_{i+1}}{q_i}$.
 
 \subsubsection{The Work}
-In addition to the \texttt{scanInc} implementation, we also made several optimizations. Many of the changes are minor, and include re-using shared memory. Both \texttt{u} and \texttt{uu} have been moved to shared memory.
+Because of time constraints, we have used the \texttt{TRIDAG\_SOLVER} given to us instead of implementing our own tridag solver from scratch.
+In addition to the maps and \texttt{scanInc} optimizations of tridag, we made several optimizations to the na\"ive CUDA implementation. Many of the changes are minor, and include: re-using shared memory, transpose arrays for memory coalesced access, keep variables in private cache until modification is done before writing to global memory, reduce the number of floating point operations by simplifying computations.
+
+In tridag, we are able to re-use the shared memory for  \texttt{mat\_sh} and \texttt{lin\_sh} since all computations using \texttt{mat\_sh} are completed before doing computations on \texttt{lin\_sh}, and both arrays have one element per thread. Both \texttt{u} and \texttt{uu} have been moved to shared memory for fewer accessed to global memory. Finally, the \texttt{a[gid]} is accessed twice and thus by holding it in a register we save yet another access to global memory.
 
 Whenever there were consecutive \texttt{+=} operations in \texttt{explicitX} and \texttt{explicitY}, we created a local variable to hold the value until the final \texttt{+=} operation.
 
