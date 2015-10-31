@@ -277,7 +277,7 @@ $u_i = \dfrac{q_{i+1}}{q_i}$.
 
 \subsubsection{The Work}
 Because of time constraints, we have used the \texttt{TRIDAG\_SOLVER} given to us instead of implementing our own tridag solver from scratch.
-In addition to the maps and \texttt{scanInc} optimizations of tridag, we made several optimizations to the na\"ive CUDA implementation. Many of the changes are minor, and include: re-using shared memory, transpose arrays for memory coalesced access, keep variables in private cache until modification is done before writing to global memory, reduce the number of floating point operations by simplifying computations.
+In addition to the maps and \texttt{scanInc} optimizations of tridag, we made several optimizations to the Na\"ive CUDA implementation. Many of the changes are minor, and include: re-using shared memory, transpose arrays for memory coalesced access, keep variables in private cache until modification is done before writing to global memory, reduce the number of floating point operations by simplifying computations.
 
 In tridag, we are able to re-use the shared memory for  \texttt{mat\_sh} and \texttt{lin\_sh} since all computations using \texttt{mat\_sh} are completed before doing computations on \texttt{lin\_sh}, and both arrays have one element per thread. Both \texttt{u} and \texttt{uu} have been moved to shared memory for fewer accessed to global memory. Finally, the \texttt{a[gid]} is accessed twice and thus by holding it in a register we save yet another access to global memory.
 
