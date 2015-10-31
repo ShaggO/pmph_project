@@ -296,7 +296,10 @@ Several variables are moved to shared memory, some of the kernels are computed t
 We are assured of the correctness of these modifications. We know that the variables we moved to shared memory were not going to cause race conditions, since they are accessed as read variables. The transposed/regular variables do not matter as long as the calculations work the same, and for some of the operations it is easier to perform them with a transposed version of the matrices.
 \section{Results}
 Table \ref{fig:results} shows the total execution times for the four versions of the code: Sequential CPU, OpenMP CPU, Na\"ive CUDA, and Optimized CUDA for both the small and large dataset. We have deliberately excluded the medium dataset since the \texttt{tridag} CUDA kernel only runs on datasets matching the dimensions of the CUDA kernel.
-\subsection{Comparisons}
+
+Timing was done with the use of the test code provided to use by Cosmin. Since we are interested in the runtime of the algorithm, not the entire program, the only line we changed was to add the \texttt{cudaFree(0);} line before starting the timer. This prevents the CUDA library load times from adding to the algorithm.
+
+All versions of the code validate against the Sequential CPU.
 \begin{table}[h]
 \centering
 \begin{tabular}{l r r}
@@ -312,7 +315,14 @@ Optimized CUDA      & 60867     & 3647836   \\
 \end{tabular}
 \caption{\label{fig:results} Results of the three different implementations.}
 \end{table}
-\subsection{Conclusion}
+\section{Conclusion}
+The benefits of parallelism are readily apparent in the table. For the small data set, the conversion from Sequential CPU to OpenMP results in the algorithm running over 10 times faster. The conversion from OpenMP to Na\"ive CUDA gains us another factor of approximately 2, and the Optimized CUDA gets us around another \(\frac{1}{3}\). The Optimized CUDA has a speedup of roughly 37 times that of the Sequential CPU.
+
+For the large data set, we can see even bigger speedup. The OpenMP CPU runs 21 times faster than sequential. The Optimized CUDA runs almost 60 times faster than Sequential CPU.
+
+That is a massive speedup, although the tradeoff is that the algorithm is significantly more complex. The sequential implementation has a total of 438 lines of code, while the optimized code is sitting in at 1365 lines. There is a lot more work involved in converting to CUDA. By comparison, the OpenMP CPU change required only a single line added, and two lines moved. It has a total length of 439 lines of code.
+
+The conclusion to be drawn from this is that if you are going to run large algorithms many, many times, then it is absolutely worth it to build and optimize GPU code. However, for an intermediate speedup, converting to OpenMP can provide quite respectable improvements, and depending on the code structure, does not necessarily require a large investment of time to implement. As always, there is a trade-off between coding time and run time, but the OpenMP transition can be very effective.
 \bibliographystyle{plain}
 \bibliography{bibliography}
 \end{document}
