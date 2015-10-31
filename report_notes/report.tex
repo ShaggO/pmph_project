@@ -281,7 +281,17 @@ In addition to the maps and \texttt{scanInc} optimizations of tridag, we made se
 
 In tridag, we are able to re-use the shared memory for  \texttt{mat\_sh} and \texttt{lin\_sh} since all computations using \texttt{mat\_sh} are completed before doing computations on \texttt{lin\_sh}, and both arrays have one element per thread. Both \texttt{u} and \texttt{uu} have been moved to shared memory for fewer accessed to global memory. Finally, the \texttt{a[gid]} is accessed twice and thus by holding it in a register we save yet another access to global memory.
 
-Whenever there were consecutive \texttt{+=} operations in \texttt{explicitX} and \texttt{explicitY}, we created a local variable to hold the value until the final \texttt{+=} operation.
+In \texttt{explicitX} and \texttt{explicitY} we created a local variable for the
+calculation before adding to \texttt{u} and/or \texttt{v}. \texttt{myVarX[i,j,k}
+and \texttt{myVarY[i,j,k]} was also put in local memory because they were used
+in every calculation of respectively \texttt{explicitX} and \texttt{explicitY}.
+This is done to keep the number of global memory accesses down.
+To keep the number of operations down we also changed each calculation slightly
+in \texttt{explicitX} as we saw that they started with $0.5 * (0.5 * myVarX...$,
+so instead of doing that we multiplied the \texttt{myVarX} variable by $0.25$.
+And in \texttt{explicitY} every calculation started with $0.5 * (myVarY...$,
+this was removed and instead the \texttt{myVarY} variable was multiplied by
+$0.5$.
 
 The following changes are performed in order to achieve memory coalesced access in our CUDA kernels:
 \begin{description}
