@@ -32,5 +32,5 @@ for each i in outer
 
 5. Tests:
 	- Test results run on a machine w/ 16 kernels having 2 threads per kernel and 128 GB ram,
-	- a GTX 780 Titanium w/ 3GB ram GPU
+	- a GTX 780 Ti w/ 3GB ram GPU
 	- Table of results from report
