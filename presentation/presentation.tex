@@ -1,0 +1,86 @@
+\documentclass[14pt,t,english]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage{pslatex,adjustbox,graphicx,wrapfig}
+\usepackage[labelfont=scriptsize,font=scriptsize]{caption}
+\usepackage[labelfont=scriptsize,font=scriptsize]{subcaption}
+\usepackage{animate}
+\captionsetup{compatibility=false}
+\usepackage{textcomp}
+\usepackage[natbib=true,backend=biber,maxbibnames=9,bibencoding=utf8]{biblatex}
+\usetheme[unit=natbio-ics]{Frederiksberg}
+%\usetheme[natbio]{Frederiksberg}
+\useinnertheme{MLHacks}
+
+\definecolor{faded}{rgb}{0.7,0.7,0.7}
+
+\addbibresource{../../../bibliography.bib}
+\setbeamertemplate{bibliography item}[text]
+\renewcommand*{\bibfont}{\footnotesize}
+
+\AtBeginSection[]
+{
+	\begin{frame}{Agenda}
+		\tableofcontents[currentsection]
+		\ghostframe
+	\end{frame}
+}
+
+\title{PMPH project}
+%\subtitle{}
+\author[Malte Stær Nissen, René Løwe Jacobsen, and Erik John Partridge]{Malte Stær Nissen \\\and René Løwe Jacobsen \\\and Erik John Partridge}
+\institute{Department of Computer Science}
+\date[]{\today}
+%
+\begin{document}
+%
+\frame[plain]{\titlepage}
+%
+\begin{frame}{Agenda}
+	\tableofcontents
+\end{frame}
+%
+\section{Introduction}
+\begin{frame}[c]{Current work}
+\begin{itemize}
+	\vfill
+	\item Dense sliding window gives huge overlap in computations
+	\vfill
+	\item CNNs are (typically) interweaved convolutional and pooling layers ending in multiple fully connected layers
+	\vfill
+	\item Next step: Pixel-wise prediction on entire image in one forward pass using the technique of \citet{giusti2013fast}.
+	\vfill
+\end{itemize}
+\end{frame}
+\section{OpenMP}
+\section{Naiv\"e CUDA}
+\section{Optimized CUDA}
+\section{Results}
+
+
+%\begin{frame}[c]{Example}
+%\begin{figure}[tb]
+%	\centering
+%	\includegraphics[width=0.9\textwidth]{img/example_prediction.pdf}
+%	\caption{Prediction}
+%\end{figure}
+%
+%\end{frame}
+%\begin{frame}[c]{Example}
+%\begin{figure}[tb]
+%	\centering
+%	\includegraphics[width=0.9\textwidth]{img/example_components.pdf}
+%	\caption{Connected components with area larger than 50 pixels}
+%\end{figure}
+%\end{frame}
+
+%\begin{frame}[c]{Illustration of \citet{giusti2013fast}}
+%\includegraphics[width=\linewidth]{img/giustiIllustration.png}
+%\end{frame}
+
+%[allowframebreaks]
+\begin{frame}{References}
+\ghostframe
+\printbibliography
+\end{frame}
+
+\end{document}
