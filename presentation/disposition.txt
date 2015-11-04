@@ -1,0 +1,36 @@
+1. Introduction
+for each i in outer
+	initGlob
+	initOperator dxx
+	initOperator dyy
+	setPayoff
+
+	for each t in time
+		updateParams
+		explicitX
+		explicitY
+		implicitX
+		tridag
+		implicitY
+		tridag
+
+2. OpenMP:
+	- Privatized strike and PrivGlobs (moving the declarations inside the outer loop)
+	- Added pragma to outer
+
+3. Naive CUDA:
+	- Moved function bodies to one big function except tridag
+	- Distributed all simple map-able functions/loops over the outer loop by adding a second/third dimension to eliminate the outer loop. Straight forward!
+	- Wrote a kernel for each of the functions/loops.
+	- Moved the strike computation into a kernel function (since it’s only one operation).
+
+4. Optimized CUDA:
+	- Memory coalesced access: Transpose certain matrices before using them. Compute others as transposed and transpose them afterwards.
+	- Re-used shared memory in tridag
+	- Minimized the number of global memory accesses by holding temporary variables in registers instead of accessing them multiple times (both read and write accesses)
+	- Made minor changes to computations to decrease the number of floating point operations (compute 0.25 * value… instead of 0.5*(0.5*value…))
+
+5. Tests:
+	- Test results run on a machine w/ 16 kernels having 2 threads per kernel and 128 GB ram,
+	- a GTX 780 Titanium w/ 3GB ram GPU
+	- Table of results from report
