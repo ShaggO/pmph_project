@@ -5,6 +5,7 @@ src/Impl/runproject
 src/ParTridagCuda/test_tridag
 src/OrigImpl/Debug.txt
 src/Impl/Debug.txt
+presentation/presentation.pdf
 
 *.aux
 *.glo
@@ -39,3 +40,4 @@ src/Impl/Debug.txt
 *.~lock*
 *.*~
 *.swp
+*.vrb

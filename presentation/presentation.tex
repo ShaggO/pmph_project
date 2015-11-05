@@ -6,6 +6,10 @@
 \usepackage{animate}
 \captionsetup{compatibility=false}
 \usepackage{textcomp}
+\usepackage{listings}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{caption}
 \usepackage[natbib=true,backend=biber,maxbibnames=9,bibencoding=utf8]{biblatex}
 \usetheme[unit=natbio-ics]{Frederiksberg}
 %\usetheme[natbio]{Frederiksberg}
@@ -25,6 +29,27 @@
 	\end{frame}
 }
 
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+	language=c++,
+	aboveskip=3mm,
+	belowskip=3mm,
+	showstringspaces=false,
+	columns=flexible,
+	basicstyle={\tiny\ttfamily},
+	numbers=none,
+	numberstyle=\tiny\color{gray},
+	keywordstyle=\color{blue},
+	commentstyle=\color{dkgreen},
+	stringstyle=\color{mauve},
+	breaklines=true,
+	breakatwhitespace=true,
+	tabsize=3,
+}
+
 \title{PMPH project}
 %\subtitle{}
 \author[Malte Stær Nissen, René Løwe Jacobsen, and Erik John Partridge]{Malte Stær Nissen \\\and René Løwe Jacobsen \\\and Erik John Partridge}
@@ -39,23 +64,260 @@
 	\tableofcontents
 \end{frame}
 %
-\section{Introduction}
-\begin{frame}[c]{Current work}
+\section{Introduction and OpenMP}
+\begin{frame}[c,fragile]{Introduction and OpenMP}
+High level code structure:
+\begingroup
+	\fontsize{10pt}{12pt}\selectfont
+\begin{verbatim}
+for each i in outer {    // parallel loop
+    initGlob
+    initOperator dxx
+    initOperator dyy
+    setPayoff
+
+    for each t in time { // sequential loop
+        updateParams
+        explicitX
+        explicitY
+        implicitX
+        tridag
+        implicitY
+        tridag
+    }
+}
+\end{verbatim}
+\endgroup
+\end{frame}
+%
+\section{Na\"ive CUDA}
+%
+\begin{frame}[c,fragile]{Loop distribution}
+\begingroup
+	\fontsize{10pt}{12pt}\selectfont
+\begin{verbatim}
+for each i in outer {    // parallel loop
+    initGlob
+    initOperator dxx
+    initOperator dyy
+    setPayoff
+
+    for each t in time { // sequential loop
+        updateParams
+        explicitX
+        explicitY
+        implicitX
+        tridag
+        implicitY
+        tridag
+    }
+}
+\end{verbatim}
+\endgroup
+\end{frame}
+%
+\begin{frame}[c,fragile]{Loop distribution}
+\begingroup
+	\fontsize{10pt}{12pt}\selectfont
+\begin{verbatim}
+deviceInitGlob
+deviceInitOperator dxx
+deviceInitOperator dyy
+deviceSetPayoff
+
+for each i in outer {    // parallel loop
+    for each t in time { // sequential loop
+        updateParams
+        explicitX
+        explicitY
+        implicitX
+        tridag
+        implicitY
+        tridag
+    }
+}
+\end{verbatim}
+\endgroup
+\end{frame}
+%
+\begin{frame}[c,fragile]{Loop interchange}
+\begingroup
+	\fontsize{10pt}{12pt}\selectfont
+\begin{verbatim}
+deviceInitGlob
+deviceInitOperator dxx
+deviceInitOperator dyy
+deviceSetPayoff
+
+for each t in time {       // sequential loop
+    for each i in outer {  // parallel loop
+        updateParams
+        explicitX
+        explicitY
+        implicitX
+        tridag
+        implicitY
+        tridag
+    }
+}
+\end{verbatim}
+\endgroup
+\end{frame}
+%
+\begin{frame}[c,fragile]{Loop distribution}
+\begingroup
+	\fontsize{10pt}{12pt}\selectfont
+\begin{verbatim}
+deviceInitGlob
+deviceInitOperator dxx
+deviceInitOperator dyy
+deviceSetPayoff
+
+for each t in time {       // sequential loop
+    deviceUpdateParams
+    deviceExplicitX
+    deviceExplicitY
+    deviceImplicitX
+    tridag_solver
+    deviceImplicitY
+    tridag_solver
+}
+\end{verbatim}
+\endgroup
+\end{frame}
+%
+\section{Optimized CUDA}
+%
+\begin{frame}[c,fragile]{Memory coalescing}
+\begingroup
+	\fontsize{10pt}{12pt}\selectfont
+\begin{verbatim}
+deviceExplicitX // computes the transpose of u
+deviceExplicitY // writes directly to the transpose of u
+deviceImplicitX // computes the transpose of a, b and c
+transpose u, a, b and c
+tridag_solver
+transpose u
+deviceImplicitY // reads from the transpose of u
+tridag_solver
+\end{verbatim}
+\endgroup
+\end{frame}
+%
+\begin{frame}[c]{Other optimizations}
 \begin{itemize}
 	\vfill
-	\item Dense sliding window gives huge overlap in computations
+	\item Re-usage of shared memory (tridag)
 	\vfill
-	\item CNNs are (typically) interweaved convolutional and pooling layers ending in multiple fully connected layers
+	\item Reduction of global memory accesses
 	\vfill
-	\item Next step: Pixel-wise prediction on entire image in one forward pass using the technique of \citet{giusti2013fast}.
+	\item Reduction of floating point operations
 	\vfill
 \end{itemize}
 \end{frame}
-\section{OpenMP}
-\section{Naiv\"e CUDA}
-\section{Optimized CUDA}
-\section{Results}
+%
+\begin{frame}[fragile]{ExplicitX na\"ive}
+\begin{lstlisting}
+// u[outer][numY][numX]
+int uindex = i*numY*numX + k*numX + j;
+// myVarX [outer][numX][numY]
+int myVarXindex = i*numX*numY + j * numY + k;
+// myResult[outer][numX][numY]
+u[uindex] = dtInv * myResult[myVarXindex];
 
+// Dxx [outer][numX][4]
+int Dxxindex = i*numX*4 + j*4;
+REAL varX = myVarX[myVarXindex];
+if (j > 0) {
+    u[uindex] +=    0.5*(0.5*varX*myDxx[Dxxindex])
+                        * myResult[i*numX*numY + (j-1)*numY + k];
+}
+u[uindex] +=        0.5*(0.5*varX*myDxx[Dxxindex+1])
+                        * myResult[myVarXindex];
+if (j < numX) {
+    u[uindex] +=    0.5*(0.5*varX*myDxx[Dxxindex+2])
+                        * myResult[i*numX*numY + (j+1)*numY + k];
+}
+\end{lstlisting}
+\end{frame}
+%
+\begin{frame}[fragile]{ExplicitX coalesced}
+
+\begin{lstlisting}
+
+
+// myVarX [outer][numX][numY]
+int idx = i*numX*numY + j * numY + k;
+// myResult[outer][numX][numY]
+u[idx] = dtInv * myResult[idx];
+
+// Dxx [outer][numX][4]
+int Dxxindex = i*numX*4 + j*4;
+REAL varX = myVarX[idx];
+if (j > 0) {
+    u[idx] +=    0.5*(0.5*varX*myDxx[Dxxindex])
+                        * myResult[i*numX*numY + (j-1)*numY + k];
+}
+u[idx] +=        0.5*(0.5*varX*myDxx[Dxxindex+1])
+                        * myResult[idx];
+if (j < numX) {
+    u[idx] +=    0.5*(0.5*varX*myDxx[Dxxindex+2])
+                        * myResult[i*numX*numY + (j+1)*numY + k];
+}
+\end{lstlisting}
+\end{frame}
+%
+\begin{frame}[fragile]{ExplicitX optimized}
+
+\begin{lstlisting}
+// u[outer][numX][numY]
+int idxO = i*numX*numY;
+int idx = idxO + j*numY + k;
+// myResult[outer][numX][numY]
+REAL uval;
+uval = dtInv * myResult[idx];
+
+// Dxx [outer][numX][4]
+int Dxxindex = i*numX*4 + j*4;
+REAL varX = 0.25*myVarX[idx];
+if (j > 0) {
+    uval +=    (varX*myDxx[Dxxindex])
+                      * myResult[idxO + (j-1)*numY + k];
+}
+uval +=        (varX*myDxx[Dxxindex+1])
+                       * myResult[idx];
+if (j < numX) {
+    uval +=    (varX*myDxx[Dxxindex+2])
+                       * myResult[idxO + (j+1)*numY + k];
+}
+u[idx] = uval;
+\end{lstlisting}
+\end{frame}
+\section{Results}
+\begin{frame}[c]{Results}
+\begin{itemize}
+\item All versions validate on the small and large datasets
+\item Results obtained by executing on one of the APL GPU machines
+\end{itemize}
+\begingroup
+	\fontsize{10pt}{12pt}\selectfont
+\begin{table}[h]
+\centering
+\begin{tabular}{l r r}
+\toprule
+\multirow{2}{*}{Version}        & \multicolumn{2}{c}{Total execution time (microseconds)} \\
+                    & Small     & Large \\
+\midrule
+Sequential CPU      & 2,297,659   & 216,305,907 \\
+OpenMP CPU          & 213,948    & 10,132,446  \\
+Na\"ive CUDA        & 92,787     & 6,975,193   \\
+Optimized CUDA      & 60,867     & 3,647,836   \\
+\bottomrule
+\end{tabular}
+\caption{Results of the three different implementations.}
+\end{table}
+\endgroup
+\end{frame}
 
 %\begin{frame}[c]{Example}
 %\begin{figure}[tb]
@@ -78,9 +340,5 @@
 %\end{frame}
 
 %[allowframebreaks]
-\begin{frame}{References}
-\ghostframe
-\printbibliography
-\end{frame}
 
 \end{document}
